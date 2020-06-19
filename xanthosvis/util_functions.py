@@ -1,6 +1,8 @@
 import pandas as pd
 import plotly.express as px
 import json
+import plotly.graph_objects as go
+
 
 def get_available_years(in_file, non_year_fields=['id']):
     """Get available years from file.  Reads only the header from the file.
@@ -200,15 +202,18 @@ def plot_choropleth(df, geojson_basin):
 
     """
 
+    fig = go.Figure(
+        data=go.Choropleth(geojson=geojson_basin, locations=df['basin_id'], z=df['q'], colorscale="Viridis"))
 
-    fig = px.choropleth(df, geojson=geojson_basin, locations='basin_id', color='q',
-                        color_continuous_scale="Viridis")
+    # fig = px.choropleth(df, geojson=geojson_basin, locations='basin_id', color='q',
+    #                     color_continuous_scale="Viridis")
 
     fig.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
-    #fig.show()
+    # fig.show()
     return fig
 
-def update_choropleth(df, fig):
+
+def update_choropleth(df, fig, geojson_basin):
     """Plot interactive choropleth map for basin level statistics.
 
     :param df:                      dataframe with basin level stats
@@ -218,9 +223,11 @@ def update_choropleth(df, fig):
 
     """
 
-    fig.data = list(df)
+    fig = go.Figure(
+        data=go.Choropleth(geojson=geojson_basin, locations=df['basin_id'], z=df['q'], colorscale="Viridis"))
 
     return fig
+
 
 def plot_hydrograph(df, basin_id):
     """Plot a hydrograph of a specific basin.
@@ -235,5 +242,5 @@ def plot_hydrograph(df, basin_id):
 
     fig = px.line(df, x='Year', y='q', title=f"Basin {basin_id} Runoff per Year")
 
-    #fig.show()
+    # fig.show()
     return fig

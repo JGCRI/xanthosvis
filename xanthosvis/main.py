@@ -9,7 +9,8 @@ import ipywidgets as widgets
 import pandas as pd
 import seaborn as sns
 import json
-
+import plotly.graph_objects as go
+import plotly.express as px
 import xanthosvis.util_functions as xvu
 
 sns.set()
@@ -39,7 +40,7 @@ acceptable_statistics = ['mean', 'median', 'min', 'max', 'standard deviation']
 
 # Process years to extract from the input file
 # list comprehension to create a target year list of strings
-target_years_list = [str(i) for i in range(start_year,  max(through_years_list), 1)]
+target_years_list = [str(i) for i in range(start_year, max(through_years_list), 1)]
 # Generate data
 # read in reference file to dataframe
 df_ref = pd.read_csv(gridcell_ref_file)
@@ -114,7 +115,9 @@ app.layout = html.Div([
                         dbc.Col(html.Div([
                             dcc.Graph(
                                 id='choro',
-                                figure=choro_plot
+                                figure=dict(
+                                        data=[],
+                                        layout={})
                             )
                         ]), style={'border': '1px solid'})
                     ),
@@ -151,48 +154,33 @@ def set_through_year_list(value):
      dash.dependencies.Input('statistic', 'value')])
 def update_choro(start, end, stat):
     print(start, end)
-    new_data = xvu.data_per_basin(df, stat, target_years_list[start:end])
-    return xvu.update_choropleth(new_data, choro_plot)
+    try:
+        index_start = target_years_list.index(str(start))
+    except:
+        index_start = 0
+    try:
+        index_end = target_years_list.index(str(end))
+    except:
+        index_end = len(target_years_list) - 1
+    new_data = xvu.data_per_basin(df, stat, target_years_list[index_start:index_end])
+    #fig = px.choropleth(new_data,
+     #              geojson=basin_json, locations='basin_id', color='q')
+    data = [dict(type='choropleth',
+                 geojson=basin_features,
+                 locations=new_data['basin_id'],
+                 z=new_data['q'],
+                 colorscale='Viridis')]
+        # go.Choropleth(geojson=basin_json, locations=new_data['basin_id'], z=new_data['q'],
+        #                       colorscale="Viridis"))]
+    layout = dict(title='My Title')
+    # fig = go.Figure(
+    #     data=go.Choropleth(geojson=basin_json, locations=new_data['basin_id'], z=new_data['q'], colorscale="Viridis"))
+    #fig.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
+    return {
+        'data': data,
+        'layout': layout
 
-
-#
-# @app.callback(dash.dependencies.Output('through_year'  'options'),
-#     [dash.dependencies.Input('start_year', 'value')])
-# def set_through_year(start_year):
-#     return [{'label': i, 'value': i} for i in all_options[selected_country]]
-
-# @app.callback(dash.dependencies.Output('choro', 'figure'),
-#     [dash.dependencies.Input('start_year', 'value'),
-#      dash.dependencies.Input('end_year', 'value')])
-# def update_graph(start_year, end_year):
-#     xvu.prepare_data(in_file, target_years_list, df_ref)
-#     return {
-#         'data': [dict(
-#             x=dff[dff['Indicator Name'] == xaxis_column_name]['Value'],
-#             y=dff[dff['Indicator Name'] == yaxis_column_name]['Value'],
-#             text=dff[dff['Indicator Name'] == yaxis_column_name]['Country Name'],
-#             customdata=dff[dff['Indicator Name'] == yaxis_column_name]['Country Name'],
-#             mode='markers',
-#             marker={
-#                 'size': 15,
-#                 'opacity': 0.5,
-#                 'line': {'width': 0.5, 'color': 'white'}
-#             }
-#         )],
-#         'layout': dict(
-#             xaxis={
-#                 'title': xaxis_column_name,
-#                 'type': 'linear' if xaxis_type == 'Linear' else 'log'
-#             },
-#             yaxis={
-#                 'title': yaxis_column_name,
-#                 'type': 'linear' if yaxis_type == 'Linear' else 'log'
-#             },
-#             margin={'l': 40, 'b': 30, 't': 10, 'r': 0},
-#             height=450,
-#             hovermode='closest'
-#         )
-#     }
+    }
 
 
 if __name__ == '__main__':
