@@ -1,3 +1,7 @@
+import pandas as pd
+import plotly.express as px
+import json
+
 def get_available_years(in_file, non_year_fields=['id']):
     """Get available years from file.  Reads only the header from the file.
 
@@ -177,7 +181,7 @@ def process_geojson(in_file):
     :return:                        geojson array
 
     """
-    with open(basin_json) as get:
+    with open(in_file) as get:
         basin_features = json.load(get)
 
     for fx in basin_features['features']:
@@ -186,7 +190,25 @@ def process_geojson(in_file):
     return basin_features
 
 
-def plot_choropleth(df, geojson_file):
+def plot_choropleth(df, geojson_basin):
+    """Plot interactive choropleth map for basin level statistics.
+
+    :param df:                      dataframe with basin level stats
+    :type df:                       dataframe
+
+    :param geojson_basin:            geojson spatial data and basin id field
+
+    """
+
+
+    fig = px.choropleth(df, geojson=geojson_basin, locations='basin_id', color='q',
+                        color_continuous_scale="Viridis")
+
+    fig.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
+    #fig.show()
+    return fig
+
+def update_choropleth(df, fig):
     """Plot interactive choropleth map for basin level statistics.
 
     :param df:                      dataframe with basin level stats
@@ -196,14 +218,9 @@ def plot_choropleth(df, geojson_file):
 
     """
 
-    basin_features = process_geojson(geojson_file)
+    fig.data = list(df)
 
-    fig = px.choropleth(df, geojson=basin_features, locations='basin_id', color='q',
-                        color_continuous_scale="Viridis")
-
-    fig.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
-    fig.show()
-
+    return fig
 
 def plot_hydrograph(df, basin_id):
     """Plot a hydrograph of a specific basin.
@@ -216,6 +233,7 @@ def plot_hydrograph(df, basin_id):
 
     """
 
-    fig = px.line(dfx, x='Year', y='q', title=f"Basin {basin_id} Runoff per Year")
+    fig = px.line(df, x='Year', y='q', title=f"Basin {basin_id} Runoff per Year")
 
-    fig.show()
+    #fig.show()
+    return fig

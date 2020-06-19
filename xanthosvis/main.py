@@ -1,28 +1,22 @@
 # -*- coding: utf-8 -*-
 import os
+
 import dash
+import dash_bootstrap_components as dbc
 import dash_core_components as dcc
 import dash_html_components as html
-import dash_bootstrap_components as dbc
-import pandas as pd
-from sklearn.linear_model import LinearRegression
-import plotly.express as px
-import math
-from dash.dependencies import Input, Output, State
-from datetime import datetime
-import base64
-import datetime
-import io
-import dash_table
-import matplotlib.pyplot as plt
-import seaborn as sns; sns.set()
-import xanthosvis.util_functions as xvu
 import ipywidgets as widgets
+import pandas as pd
+import seaborn as sns
 import json
+
+import xanthosvis.util_functions as xvu
+
+sns.set()
 
 app = dash.Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
 
-root_dir = '/Users/d3y010/projects/evanoff/xanthosvis/data'
+root_dir = 'include/'
 
 # reference file to be included in the package data
 gridcell_ref_file = os.path.join(root_dir, 'reference', 'xanthos_0p5deg_landcell_reference.csv')
@@ -34,49 +28,19 @@ basin_json = os.path.join(root_dir, 'reference', 'gcam_basins.geojson')
 in_file = os.path.join(root_dir, 'input', 'q_km3peryear_pm_abcd_mrtm_watch_1971_2001.csv.zip')
 # get a list of available years from file
 available_year_list = xvu.get_available_years(in_file)
-
-# get start year from user input
-start_year = widgets.Dropdown(
-    options=available_year_list,
-    value=min(available_year_list),
-    description='Start Year:',
-    disabled=False,
-)
-
-display(start_year)
-print(start_year.value)
+# set start year
+start_year = available_year_list[0]
 
 # get a list of available through years
-through_years_list = xvu.available_through_years(available_year_list, start_year.value)
-
-# get through year from user input
-through_year = widgets.Dropdown(
-    options=through_years_list,
-    value=max(through_years_list),
-    description='Through Year:',
-    disabled=False,
-)
-
-display(through_year)
-print(through_year.value)
+through_years_list = xvu.available_through_years(available_year_list, start_year)
 
 # Runoff Statistic for the Choropleth Map
 acceptable_statistics = ['mean', 'median', 'min', 'max', 'standard deviation']
 
-# get through year from user input
-statistic = widgets.Dropdown(
-    options=acceptable_statistics,
-    description='Runoff statistic:',
-    disabled=False,
-)
-
-display(statistic)
-print(statistic.value)
-
 # Process years to extract from the input file
 # list comprehension to create a target year list of strings
-target_years_list = [str(i) for i in range(start_year.value, through_year.value + 1, 1)]
-#Generate data
+target_years_list = [str(i) for i in range(start_year,  max(through_years_list), 1)]
+# Generate data
 # read in reference file to dataframe
 df_ref = pd.read_csv(gridcell_ref_file)
 
@@ -84,47 +48,25 @@ df_ref = pd.read_csv(gridcell_ref_file)
 df = xvu.prepare_data(in_file, target_years_list, df_ref)
 
 # get data frame to use for plotting the choropleth map
-df_per_basin = xvu.data_per_basin(df, statistic.value, target_years_list)
+df_per_basin = xvu.data_per_basin(df, acceptable_statistics[0], target_years_list)
+basin_features = xvu.process_geojson(basin_json)
 
 # create plot
-xvu.plot_choropleth(df_per_basin, basin_json)
+choro_plot = xvu.plot_choropleth(df_per_basin, basin_features)
 
 # Generate time series plot
 # # basin id will come from the click event
 basin_id = 168
 
 # # data frame of values for the target basin
-dfx = xvu.data_per_year_basin(df, basin_id)#
+dfx = xvu.data_per_year_basin(df, basin_id)  #
 # # plot hydrograph
-xvu.plot_hydrograph(dfx, basin_id)
+hydro_plot = xvu.plot_hydrograph(dfx, basin_id)
 
 colors = {
     'background': '#111111',
     'text': '#7FDBFF'
 }
-
-df = pd.read_csv('include/Diagnostics_Runoff_Basin_Scale_km3peryr.csv')
-
-x = df['xanthos'].values.reshape(-1, 1)
-y = df['VIC_1971-2000'].values.reshape(-1, 1)
-model = LinearRegression().fit(x, y)
-r_sq = model.score(x, y)
-
-fig = px.scatter(df, x="xanthos", y="VIC_1971-2000", trendline="ols")
-fig.update_layout(
-    title={'text': "Xanthos to VIC Runoff: R=" + str(round(math.sqrt(r_sq), 6)), 'y': 0.9, 'x': 0.5,
-           'xanchor': 'center', 'yanchor': 'top'},
-    xaxis_title="Xanthos Runoff (km\N{SUPERSCRIPT THREE}/yr)",
-    yaxis_title="VIC Runoff (km\N{SUPERSCRIPT THREE}/yr)",
-    # height:400,
-    # margin: {'l': 10, 'b': 20, 't': 0, 'r': 0}
-    # font=dict(
-    #     family="Courier New, monospace",
-    #     size=18,
-    #     color="#7f7f7f"
-    # ) 'height': 400,
-    #                                     'margin': {'l': 10, 'b': 20, 't': 0, 'r': 0}
-)
 
 app.layout = html.Div([
     dbc.Row(
@@ -150,22 +92,42 @@ app.layout = html.Div([
                     multiple=True
                 ),
                 html.Div(id='output-data-upload'),
-            ]), width=6, style={'border': '1px solid'}),
+                dcc.Dropdown(
+                    id='statistic',
+                    options=[{'label': i, 'value': i} for i in acceptable_statistics],
+                    value=acceptable_statistics[0], clearable=False
+                ),
+                dcc.Dropdown(
+                    id='start_year',
+                    options=[{'label': i, 'value': i} for i in available_year_list],
+                    value=available_year_list[0], clearable=False
+                ),
+                dcc.Dropdown(
+                    id='through_year',
+                    options=[{'label': i, 'value': i} for i in through_years_list],
+                    value=available_year_list[len(available_year_list) - 1], clearable=False
+                ),
+            ]), width=4, style={'border': '1px solid'}),
             dbc.Col(
                 [
                     dbc.Row(
-                        dbc.Col(html.Div('Nested Row1-Col2-Row1'), style={'border': '1px solid'})
+                        dbc.Col(html.Div([
+                            dcc.Graph(
+                                id='choro',
+                                figure=choro_plot
+                            )
+                        ]), style={'border': '1px solid'})
                     ),
                     dbc.Row(
                         dbc.Col(html.Div([
                             dcc.Graph(
-                                id='life-exp-vs-gdp',
-                                figure=fig
+                                id='hydro',
+                                figure=hydro_plot
                             )
                         ]), style={'border': '1px solid'})
                     )
                 ],
-                width=6,
+                width=7,
                 style={'border': '1px solid'}
             )
         ]
@@ -174,54 +136,63 @@ app.layout = html.Div([
 )
 
 
-def parse_contents(contents, filename, date):
-    content_type, content_string = contents.split(',')
-
-    decoded = base64.b64decode(content_string)
-    try:
-        if 'csv' in filename:
-            # Assume that the user uploaded a CSV file
-            df2 = pd.read_csv(
-                io.StringIO(decoded.decode('utf-8')))
-        elif 'xls' in filename:
-            # Assume that the user uploaded an excel file
-            df2 = pd.read_excel(io.BytesIO(decoded))
-    except Exception as e:
-        print(e)
-        return html.Div([
-            'There was an error processing this file.'
-        ])
-
-    return html.Div([
-        html.H5(filename),
-        html.H6(datetime.datetime.fromtimestamp(date)),
-
-        dash_table.DataTable(
-            data=df2.to_dict('records'),
-            columns=[{'name': i, 'id': i} for i in df2.columns]
-        ),
-
-        html.Hr(),  # horizontal line
-
-        # For debugging, display the raw contents provided by the web browser
-        html.Div('Raw Content'),
-        html.Pre(contents[0:200] + '...', style={
-            'whiteSpace': 'pre-wrap',
-            'wordBreak': 'break-all'
-        })
-    ])
+@app.callback(
+    dash.dependencies.Output('through_year', 'options'),
+    [dash.dependencies.Input('start_year', 'value')])
+def set_through_year_list(value):
+    print(value)
+    return [{'label': i, 'value': i} for i in through_years_list if i >= value]
 
 
-@app.callback(Output('output-data-upload', 'children'),
-              [Input('upload-data', 'contents')],
-              [State('upload-data', 'filename'),
-               State('upload-data', 'last_modified')])
-def update_output(list_of_contents, list_of_names, list_of_dates):
-    if list_of_contents is not None:
-        children = [
-            parse_contents(c, n, d) for c, n, d in
-            zip(list_of_contents, list_of_names, list_of_dates)]
-        return children
+@app.callback(
+    dash.dependencies.Output('choro', 'figure'),
+    [dash.dependencies.Input('start_year', 'value'),
+     dash.dependencies.Input('through_year', 'value'),
+     dash.dependencies.Input('statistic', 'value')])
+def update_choro(start, end, stat):
+    print(start, end)
+    new_data = xvu.data_per_basin(df, stat, target_years_list[start:end])
+    return xvu.update_choropleth(new_data, choro_plot)
+
+
+#
+# @app.callback(dash.dependencies.Output('through_year'  'options'),
+#     [dash.dependencies.Input('start_year', 'value')])
+# def set_through_year(start_year):
+#     return [{'label': i, 'value': i} for i in all_options[selected_country]]
+
+# @app.callback(dash.dependencies.Output('choro', 'figure'),
+#     [dash.dependencies.Input('start_year', 'value'),
+#      dash.dependencies.Input('end_year', 'value')])
+# def update_graph(start_year, end_year):
+#     xvu.prepare_data(in_file, target_years_list, df_ref)
+#     return {
+#         'data': [dict(
+#             x=dff[dff['Indicator Name'] == xaxis_column_name]['Value'],
+#             y=dff[dff['Indicator Name'] == yaxis_column_name]['Value'],
+#             text=dff[dff['Indicator Name'] == yaxis_column_name]['Country Name'],
+#             customdata=dff[dff['Indicator Name'] == yaxis_column_name]['Country Name'],
+#             mode='markers',
+#             marker={
+#                 'size': 15,
+#                 'opacity': 0.5,
+#                 'line': {'width': 0.5, 'color': 'white'}
+#             }
+#         )],
+#         'layout': dict(
+#             xaxis={
+#                 'title': xaxis_column_name,
+#                 'type': 'linear' if xaxis_type == 'Linear' else 'log'
+#             },
+#             yaxis={
+#                 'title': yaxis_column_name,
+#                 'type': 'linear' if yaxis_type == 'Linear' else 'log'
+#             },
+#             margin={'l': 40, 'b': 30, 't': 10, 'r': 0},
+#             height=450,
+#             hovermode='closest'
+#         )
+#     }
 
 
 if __name__ == '__main__':
