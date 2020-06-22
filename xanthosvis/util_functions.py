@@ -38,8 +38,8 @@ def available_through_years(available_year_list, start_year):
     :return:                               list of available through years
 
     """
-
-    return [i for i in available_year_list if i >= start_year]
+    return [{'label': i, 'value': i} for i in available_year_list if i >= start_year]
+    # return [i for i in available_year_list if i >= start_year]
 
 
 def basin_to_gridcell_dict(df_reference):
@@ -244,3 +244,16 @@ def plot_hydrograph(df, basin_id):
 
     # fig.show()
     return fig
+
+
+def get_target_years(start, end, start_year_list, end_year_list):
+    try:
+        index_start = start_year_list.index(start)
+    except:
+        index_start = 0
+    try:
+        index_end = end_year_list.index(end)
+    except:
+        index_end = len(end_year_list) - 1
+
+        return list(index_start, index_end)

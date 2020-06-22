@@ -12,6 +12,7 @@ import json
 import plotly.graph_objects as go
 import plotly.express as px
 import xanthosvis.util_functions as xvu
+from dash.dependencies import Input, Output
 
 sns.set()
 
@@ -28,19 +29,20 @@ basin_json = os.path.join(root_dir, 'reference', 'gcam_basins.geojson')
 # in file to be uploaded by the user
 in_file = os.path.join(root_dir, 'input', 'q_km3peryear_pm_abcd_mrtm_watch_1971_2001.csv.zip')
 # get a list of available years from file
-available_year_list = xvu.get_available_years(in_file)
+start_year_list = xvu.get_available_years(in_file)
 # set start year
-start_year = available_year_list[0]
+start_year = start_year_list[0]
+end_year = start_year_list[len(start_year_list) - 1]
 
 # get a list of available through years
-through_years_list = xvu.available_through_years(available_year_list, start_year)
+through_years_list = start_year_list  # xvu.available_through_years(start_year_list, start_year)
 
 # Runoff Statistic for the Choropleth Map
 acceptable_statistics = ['mean', 'median', 'min', 'max', 'standard deviation']
 
 # Process years to extract from the input file
 # list comprehension to create a target year list of strings
-target_years_list = [str(i) for i in range(start_year, max(through_years_list), 1)]
+target_years_list = [str(i) for i in range(start_year, end_year + 1)]  # range(start_year, max(through_years_list), 1)]
 # Generate data
 # read in reference file to dataframe
 df_ref = pd.read_csv(gridcell_ref_file)
@@ -100,13 +102,13 @@ app.layout = html.Div([
                 ),
                 dcc.Dropdown(
                     id='start_year',
-                    options=[{'label': i, 'value': i} for i in available_year_list],
-                    value=available_year_list[0], clearable=False
+                    options=[{'label': i, 'value': i} for i in start_year_list],
+                    value=start_year_list[0], clearable=False
                 ),
                 dcc.Dropdown(
                     id='through_year',
                     options=[{'label': i, 'value': i} for i in through_years_list],
-                    value=available_year_list[len(available_year_list) - 1], clearable=False
+                    value=start_year_list[len(start_year_list) - 1], clearable=False
                 ),
             ]), width=4, style={'border': '1px solid'}),
             dbc.Col(
@@ -116,8 +118,8 @@ app.layout = html.Div([
                             dcc.Graph(
                                 id='choro',
                                 figure=dict(
-                                        data=[],
-                                        layout={})
+                                    data=[],
+                                    layout={})
                             )
                         ]), style={'border': '1px solid'})
                     ),
@@ -140,47 +142,56 @@ app.layout = html.Div([
 
 
 @app.callback(
-    dash.dependencies.Output('through_year', 'options'),
-    [dash.dependencies.Input('start_year', 'value')])
+    Output('through_year', 'options'),
+    [Input('start_year', 'value')])
 def set_through_year_list(value):
     print(value)
-    return [{'label': i, 'value': i} for i in through_years_list if i >= value]
+    year_list = xvu.available_through_years(start_year_list, value)
+    return year_list
+
+
+# return [{'label': i, 'value': i} for i in through_years_list if i >= value]
 
 
 @app.callback(
-    dash.dependencies.Output('choro', 'figure'),
-    [dash.dependencies.Input('start_year', 'value'),
-     dash.dependencies.Input('through_year', 'value'),
-     dash.dependencies.Input('statistic', 'value')])
+    Output('choro', 'figure'),
+    [Input('start_year', 'value'),
+     Input('through_year', 'value'),
+     Input('statistic', 'value')])
 def update_choro(start, end, stat):
     print(start, end)
-    try:
-        index_start = target_years_list.index(str(start))
-    except:
-        index_start = 0
-    try:
-        index_end = target_years_list.index(str(end))
-    except:
-        index_end = len(target_years_list) - 1
-    new_data = xvu.data_per_basin(df, stat, target_years_list[index_start:index_end])
-    #fig = px.choropleth(new_data,
-     #              geojson=basin_json, locations='basin_id', color='q')
+    years = xvu.get_target_years(start, end, start_year_list, through_years_list)
+    new_data = xvu.data_per_basin(df, stat, target_years_list[years[0]:years[1] + 1])
+    # fig = px.choropleth(new_data,
+    #              geojson=basin_json, locations='basin_id', color='q')
     data = [dict(type='choropleth',
                  geojson=basin_features,
                  locations=new_data['basin_id'],
                  z=new_data['q'],
                  colorscale='Viridis')]
-        # go.Choropleth(geojson=basin_json, locations=new_data['basin_id'], z=new_data['q'],
-        #                       colorscale="Viridis"))]
+    # go.Choropleth(geojson=basin_json, locations=new_data['basin_id'], z=new_data['q'],
+    #                       colorscale="Viridis"))]
     layout = dict(title='My Title')
     # fig = go.Figure(
     #     data=go.Choropleth(geojson=basin_json, locations=new_data['basin_id'], z=new_data['q'], colorscale="Viridis"))
-    #fig.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
+    # fig.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
     return {
         'data': data,
         'layout': layout
-
     }
+
+
+@app.callback(
+    Output('hydro', 'figure'),
+    [Input('choro', 'clickData'),
+     Input('start_year', 'value'),
+     Input('though_year', 'value')])
+def update_hydro(click_data, start, end):
+    points = click_data['points']
+    location = points[0]['location']
+    years = xvu.get_target_years(start, end)
+    new_data = xvu.data_per_year_basin(df, acceptable_statistics[0], str(i) for i in range(start_year, end_year + 1))
+    return xvu.plot_hydrograph()
 
 
 if __name__ == '__main__':
