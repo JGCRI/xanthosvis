@@ -140,7 +140,7 @@ def data_per_basin(df, statistic, yr_list):
     return grp
 
 
-def data_per_year_basin(df, basin_id):
+def data_per_year_basin(df, basin_id, yr_list):
     """Generate a data frame representing the sum of the data per year for a target basin.
 
     :param df:                      input data having data per year
@@ -156,8 +156,10 @@ def data_per_year_basin(df, basin_id):
     # sum data by basin by year
     grp = df.groupby('basin_id').sum()
 
-    grp.drop(columns=['id'], inplace=True)
+    keep_cols = yr_list
 
+    grp.drop(columns=['id'], inplace=True)
+    grp = grp[keep_cols]
     grp.reset_index(inplace=True)
 
     # get only target basin_id
@@ -246,14 +248,14 @@ def plot_hydrograph(df, basin_id):
     return fig
 
 
-def get_target_years(start, end, start_year_list, end_year_list):
-    try:
-        index_start = start_year_list.index(start)
-    except:
-        index_start = 0
-    try:
-        index_end = end_year_list.index(end)
-    except:
-        index_end = len(end_year_list) - 1
+def get_target_years(start, end):
+    # try:
+    #     index_start = start_year_list.index(start)
+    # except:
+    #     index_start = 0
+    # try:
+    #     index_end = end_year_list.index(end)
+    # except:
+    #     index_end = len(end_year_list) - 1
 
-        return list(index_start, index_end)
+    return [str(i) for i in range(start, end + 1)]

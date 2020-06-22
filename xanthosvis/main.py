@@ -42,7 +42,7 @@ acceptable_statistics = ['mean', 'median', 'min', 'max', 'standard deviation']
 
 # Process years to extract from the input file
 # list comprehension to create a target year list of strings
-target_years_list = [str(i) for i in range(start_year, end_year + 1)]  # range(start_year, max(through_years_list), 1)]
+target_years_list = xvu.get_target_years(start_year, end_year)  # [str(i) for i in range(start_year, end_year + 1)]  # range(start_year, max(through_years_list), 1)]
 # Generate data
 # read in reference file to dataframe
 df_ref = pd.read_csv(gridcell_ref_file)
@@ -62,7 +62,7 @@ choro_plot = xvu.plot_choropleth(df_per_basin, basin_features)
 basin_id = 168
 
 # # data frame of values for the target basin
-dfx = xvu.data_per_year_basin(df, basin_id)  #
+dfx = xvu.data_per_year_basin(df, basin_id, target_years_list)  #
 # # plot hydrograph
 hydro_plot = xvu.plot_hydrograph(dfx, basin_id)
 
@@ -117,9 +117,7 @@ app.layout = html.Div([
                         dbc.Col(html.Div([
                             dcc.Graph(
                                 id='choro',
-                                figure=dict(
-                                    data=[],
-                                    layout={})
+                                figure=choro_plot
                             )
                         ]), style={'border': '1px solid'})
                     ),
@@ -150,18 +148,15 @@ def set_through_year_list(value):
     return year_list
 
 
-# return [{'label': i, 'value': i} for i in through_years_list if i >= value]
-
-
 @app.callback(
     Output('choro', 'figure'),
     [Input('start_year', 'value'),
      Input('through_year', 'value'),
-     Input('statistic', 'value')])
+     Input('statistic', 'value')], prevent_initial_call=True)
 def update_choro(start, end, stat):
     print(start, end)
-    years = xvu.get_target_years(start, end, start_year_list, through_years_list)
-    new_data = xvu.data_per_basin(df, stat, target_years_list[years[0]:years[1] + 1])
+    years = xvu.get_target_years(start, end)
+    new_data = xvu.data_per_basin(df, stat, years)
     # fig = px.choropleth(new_data,
     #              geojson=basin_json, locations='basin_id', color='q')
     data = [dict(type='choropleth',
@@ -185,13 +180,13 @@ def update_choro(start, end, stat):
     Output('hydro', 'figure'),
     [Input('choro', 'clickData'),
      Input('start_year', 'value'),
-     Input('though_year', 'value')])
+     Input('through_year', 'value')], prevent_initial_call=True)
 def update_hydro(click_data, start, end):
     points = click_data['points']
     location = points[0]['location']
     years = xvu.get_target_years(start, end)
-    new_data = xvu.data_per_year_basin(df, acceptable_statistics[0], str(i) for i in range(start_year, end_year + 1))
-    return xvu.plot_hydrograph()
+    new_data = xvu.data_per_year_basin(df, location, years)
+    return xvu.plot_hydrograph(new_data, location)
 
 
 if __name__ == '__main__':
