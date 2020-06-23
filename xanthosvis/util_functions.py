@@ -203,14 +203,18 @@ def plot_choropleth(df, geojson_basin):
     :param geojson_basin:            geojson spatial data and basin id field
 
     """
-
-    fig = go.Figure(
-        data=go.Choropleth(geojson=geojson_basin, locations=df['basin_id'], z=df['q'], colorscale="Viridis"))
-
-    # fig = px.choropleth(df, geojson=geojson_basin, locations='basin_id', color='q',
-    #                     color_continuous_scale="Viridis")
-
+    fig = px.choropleth_mapbox(df, geojson=geojson_basin, locations='basin_id',
+                                      featureidkey='properties.basin_id',
+                                      color='q', color_continuous_scale="Viridis", zoom=0)
+    fig.update_layout(mapbox_style="open-street-map")
     fig.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
+    # fig = go.Figure(
+    #     data=go.Choropleth(geojson=geojson_basin, locations=df['basin_id'], z=df['q'], colorscale="Viridis"))
+    #
+    # # fig = px.choropleth(df, geojson=geojson_basin, locations='basin_id', color='q',
+    # #                     color_continuous_scale="Viridis")
+    #
+    # fig.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
     # fig.show()
     return fig
 
@@ -225,9 +229,11 @@ def update_choropleth(df, fig, geojson_basin):
 
     """
 
-    fig = go.Figure(
-        data=go.Choropleth(geojson=geojson_basin, locations=df['basin_id'], z=df['q'], colorscale="Viridis"))
-
+    fig = px.choropleth_mapbox(df, geojson=geojson_basin, locations='basin_id',
+                               featureidkey='properties.basin_id',
+                               color='q', color_continuous_scale="Viridis", zoom=0)
+    fig.update_layout(mapbox_style="open-street-map")
+    fig.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
     return fig
 
 

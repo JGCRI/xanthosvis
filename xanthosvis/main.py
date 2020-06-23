@@ -5,14 +5,12 @@ import dash
 import dash_bootstrap_components as dbc
 import dash_core_components as dcc
 import dash_html_components as html
-import ipywidgets as widgets
 import pandas as pd
 import seaborn as sns
-import json
-import plotly.graph_objects as go
-import plotly.express as px
-import xanthosvis.util_functions as xvu
 from dash.dependencies import Input, Output
+import plotly.express as px
+
+import xanthosvis.util_functions as xvu
 
 sns.set()
 
@@ -54,6 +52,7 @@ df = xvu.prepare_data(in_file, target_years_list, df_ref)
 df_per_basin = xvu.data_per_basin(df, acceptable_statistics[0], target_years_list)
 basin_features = xvu.process_geojson(basin_json)
 
+
 # create plot
 choro_plot = xvu.plot_choropleth(df_per_basin, basin_features)
 
@@ -70,6 +69,7 @@ colors = {
     'background': '#111111',
     'text': '#7FDBFF'
 }
+
 
 app.layout = html.Div([
     dbc.Row(
