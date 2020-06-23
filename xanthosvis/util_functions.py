@@ -219,7 +219,7 @@ def plot_choropleth(df, geojson_basin):
     return fig
 
 
-def update_choropleth(df, fig, geojson_basin):
+def update_choropleth(df, geojson_basin):
     """Plot interactive choropleth map for basin level statistics.
 
     :param df:                      dataframe with basin level stats
