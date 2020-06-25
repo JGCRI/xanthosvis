@@ -4,7 +4,7 @@ import json
 import plotly.graph_objects as go
 
 
-def get_available_years(in_file, non_year_fields=['id']):
+def get_available_years(df, non_year_fields=['id']):
     """Get available years from file.  Reads only the header from the file.
 
     :params in_file:               Full path with file name and extension to the input runoff file.
@@ -18,7 +18,7 @@ def get_available_years(in_file, non_year_fields=['id']):
     """
 
     # read in only the header of the CSV
-    df = pd.read_csv(in_file, compression='infer', nrows=0)
+   # df = pd.read_csv(in_file, compression='infer', nrows=0)
 
     # drop non-year fields
     df.drop(columns=non_year_fields, inplace=True)
@@ -38,7 +38,7 @@ def available_through_years(available_year_list, start_year):
     :return:                               list of available through years
 
     """
-    return [{'label': i, 'value': i} for i in available_year_list if i >= start_year]
+    return [{'label': i, 'value': i} for i in available_year_list if int(i['value']) >= int(start_year)]
     # return [i for i in available_year_list if i >= start_year]
 
 
@@ -61,7 +61,7 @@ def basin_to_gridcell_dict(df_reference):
     return df_reference.to_dict()['basin_id']
 
 
-def prepare_data(in_file, yr_list, df_ref):
+def prepare_data(df, yr_list, df_ref):
     """Read in data from input file and add the basin id from a reference file.
 
     :param in_file:                 Full path with the file name and extension to the input data file.
@@ -77,10 +77,10 @@ def prepare_data(in_file, yr_list, df_ref):
 
     """
 
-    read_cols = yr_list + ['id']
+    #read_cols = yr_list + ['id']
 
     # read in data for target years from file
-    df = pd.read_csv(in_file, compression='infer', usecols=read_cols)
+    #df = pd.read_csv(in_file, compression='infer', usecols=read_cols)
 
     # get dictionary of grid id to basin id
     grid_basin_dict = basin_to_gridcell_dict(df_ref)
