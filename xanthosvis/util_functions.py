@@ -4,7 +4,7 @@ import json
 import plotly.graph_objects as go
 
 
-def get_available_years(df, non_year_fields=['id']):
+def get_available_years(in_file, non_year_fields=['id']):
     """Get available years from file.  Reads only the header from the file.
 
     :params in_file:               Full path with file name and extension to the input runoff file.
@@ -18,12 +18,12 @@ def get_available_years(df, non_year_fields=['id']):
     """
 
     # read in only the header of the CSV
-   # df = pd.read_csv(in_file, compression='infer', nrows=0)
+    df = pd.read_csv(in_file, compression='infer', nrows=0,  encoding='utf8', sep=",")
 
     # drop non-year fields
     df.drop(columns=non_year_fields, inplace=True)
 
-    return [int(i) for i in df.columns]
+    return [{'label': i, 'value': i} for i in df.columns]
 
 
 def available_through_years(available_year_list, start_year):
@@ -38,7 +38,11 @@ def available_through_years(available_year_list, start_year):
     :return:                               list of available through years
 
     """
-    return [{'label': i, 'value': i} for i in available_year_list if int(i['value']) >= int(start_year)]
+    options = []
+    for i in available_year_list:
+        if int(i['value']) >= int(start_year):
+            options.append(i)
+    return options
     # return [i for i in available_year_list if i >= start_year]
 
 
@@ -264,4 +268,4 @@ def get_target_years(start, end):
     # except:
     #     index_end = len(end_year_list) - 1
 
-    return [str(i) for i in range(start, end + 1)]
+    return [str(i) for i in range(int(start), int(end) + 1)]
