@@ -114,7 +114,6 @@ app.layout = html.Div(children=[
             )
         ]
     )
-    # dcc.Store(id="data_store", storage_type="memory")
 ]
 )
 
@@ -126,64 +125,30 @@ app.layout = html.Div(children=[
               prevent_initial_call=True)
 def update_choro(click, contents, filename, filedate, start, end):
     if contents:
-        try:
-            if 'zip' in filename[0]:
-                for content, name, date in zip(contents, filename, filedate):
-                    # the content needs to be split. It contains the type and the real content
-                    content_type, content_string = content.split(',')
-                    # Decode the base64 string
-                    content_decoded = base64.b64decode(content_string)
-                    # Use BytesIO to handle the decoded content
-                    zip_str = io.BytesIO(content_decoded)
-                    # Now you can use ZipFile to take the BytesIO output
-                    zip_file = ZipFile(zip_str, 'r')
-                    filename = zip_file.namelist()[0]
-                with zip_file.open(filename) as csvfile:
-                    # target_years = xvu.get_available_years(csvfile)
-                    xanthos_data = pd.read_csv(csvfile, encoding='utf8', sep=",")
-            elif 'xls' in filename[0]:
-                # Assume that the user uploaded an excel file
-                content_type, content_string = contents.split(',')
-                decoded = base64.b64decode(content_string)
-                # xanthos_data = pd.read_excel(io.BytesIO(decoded))
-            elif 'csv' in filename[0]:
-                # Assume that the user uploaded a CSV file
-                content_type, content_string = contents.split(',')
-                decoded = base64.b64decode(content_string)
-                # xanthos_data = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
-        except Exception as e:
-            print(e)
-            return None
+        xanthos_data = xvu.process_file(contents, filename, filedate)
         year_list = xvu.get_target_years(start, end)
         df = xvu.prepare_data(xanthos_data, year_list, df_ref)
         df_per_basin = xvu.data_per_basin(df, acceptable_statistics[0], year_list)
-        # options = target_years
-        # options_list = [{'label': i, 'value': i} for i in options]
-        # start_year = options_list[0]
-        # through_year = options_list[len(options_list) - 1]
-        # fig = xvu.plot_choropleth(df_per_basin, basin_features)
+
         data = [dict(type='choropleth',
                          geojson=basin_features,
                          locations=df_per_basin['basin_id'],
                          z=df_per_basin['q'],
                          colorscale='Viridis')]
-        # go.Choropleth(geojson=basin_json, locations=new_data['basin_id'], z=new_data['q'],
-        #                       colorscale="Viridis"))]
+
         layout = dict(title='My Title')
-        # fig = go.Figure(
-        # data=go.Choropleth(geojson=basin_json, locations=new_data['basin_id'], z=new_data['q'], colorscale="Viridis"))
-        # fig.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
         return {
                 'data': data,
                 'layout': layout
             }
-        # return fig
     else:
         data = []
-        # go.Choropleth(geojson=basin_json, locations=new_data['basin_id'], z=new_data['q'],
-        #                       colorscale="Viridis"))]
+
         layout = {}
-        return
+        return {
+                'data': data,
+                'layout': layout
+            }
 
 
 # Callback to generate error message
@@ -191,8 +156,7 @@ def update_choro(click, contents, filename, filedate, start, end):
 # If there is an error use default data else use uploaded data
 
 @app.callback(
-    [Output("start_year", "options"), Output("through_year", "options"), Output("start_year", "value"),
-     Output("through_year", "value")],
+    [Output("start_year", "options"),  Output("start_year", "value")],
     [Input("upload-data", "contents")], [State('upload-data', 'filename'), State('upload-data', 'last_modified')],
     prevent_initial_call=True
 )
@@ -203,71 +167,45 @@ def update_options(contents, filename, filedate):
 
     # Check if there is uploaded content
     if contents:
-        try:
-            if 'zip' in filename[0]:
-                for content, name, date in zip(contents, filename, filedate):
-                    # the content needs to be split. It contains the type and the real content
-                    content_type, content_string = content.split(',')
-                    # Decode the base64 string
-                    content_decoded = base64.b64decode(content_string)
-                    # Use BytesIO to handle the decoded content
-                    zip_str = io.BytesIO(content_decoded)
-                    # Now you can use ZipFile to take the BytesIO output
-                    zip_file = ZipFile(zip_str, 'r')
-                    filename = zip_file.namelist()[0]
-                with zip_file.open(filename) as csvfile:
-                    target_years = xvu.get_available_years(csvfile)
-                    # xanthos_data = pd.read_csv(csvfile, encoding='utf8', sep=",")
-            elif 'xls' in filename[0]:
-                # Assume that the user uploaded an excel file
-                content_type, content_string = contents.split(',')
-                decoded = base64.b64decode(content_string)
-                # xanthos_data = pd.read_excel(io.BytesIO(decoded))
-            elif 'csv' in filename[0]:
-                # Assume that the user uploaded a CSV file
-                content_type, content_string = contents.split(',')
-                decoded = base64.b64decode(content_string)
-                # xanthos_data = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
-        except Exception as e:
-            print(e)
-            return None
-
-        return target_years, target_years, target_years[0]['value'], target_years[len(target_years) - 1]['value']
-    # else:
-    #     return []
+        target_years = xvu.process_input_years(contents, filename, filedate)
+        return target_years,  target_years[0]['value']
 
 
-# @app.callback(
-#     Output('through_year', 'options'),
-#     [Input('start_year', 'value'), Input('start_year', 'options')], prevent_initial_call=True)
-# def set_through_year_list(value, options):
-#     print(value)
-#     if value is None:
-#         year_list = xvu.available_through_years(options, options[0]['value'])
-#     else:
-#         year_list = xvu.available_through_years(options, value)
-#
-#     return year_list
+@app.callback(
+    [Output('through_year', 'options'), Output('through_year', 'value')],
+    [Input('start_year', 'value'), Input('start_year', 'options')], [State('through_year', 'value')], prevent_initial_call=True)
+def set_through_year_list(value, options, current_value):
+    print(value)
+    if current_value is None:
+        year_list = xvu.available_through_years(options, options[0]['value'])
+        new_value = options[len(options)-1]['value']
+    else:
+        year_list = xvu.available_through_years(options, value)
+        new_value = current_value
+
+    return year_list, new_value
 
 
 @app.callback(
     Output('hydro_graph', 'figure'),
-    [Input('choro_graph', 'clickData'),
-     Input('start_year', 'value'),
-     Input('through_year', 'value')], prevent_initial_call=True)
-def update_hydro(click_data, start, end):
+    [Input('choro_graph', 'clickData')],
+    [State('start_year', 'value'),
+     State('through_year', 'value'),
+     State("upload-data", "contents"), State('upload-data', 'filename'), State('upload-data', 'last_modified')], prevent_initial_call=True
+)
+def update_hydro(click_data, start, end, contents, filename, filedate):
     if click_data is None:
         return
     else:
         points = click_data['points']
         location = points[0]['location']
         years = xvu.get_target_years(start, end)
-        new_data = xvu.data_per_year_basin(df, location, years)
-        return xvu.plot_hydrograph(new_data, location)
+        file_data = xvu.process_file(contents, filename, filedate)
+        processed_data = xvu.prepare_data(file_data, years, df_ref)
+        hydro_data = xvu.data_per_year_basin(processed_data, location, years)
+       # new_data = xvu.data_per_year_basin(df, location, years)
+        return xvu.plot_hydrograph(hydro_data, location)
 
 
 if __name__ == '__main__':
     app.run_server(debug=True)
-
-# def dump_this():
-#     return 0

@@ -1,3 +1,7 @@
+import base64
+import io
+from zipfile import ZipFile
+
 import pandas as pd
 import plotly.express as px
 import json
@@ -18,12 +22,12 @@ def get_available_years(in_file, non_year_fields=['id']):
     """
 
     # read in only the header of the CSV
-    df = pd.read_csv(in_file, compression='infer', nrows=0,  encoding='utf8', sep=",")
+    #df = pd.read_csv(in_file, compression='infer', nrows=0, encoding='utf8', sep=",")
 
     # drop non-year fields
-    df.drop(columns=non_year_fields, inplace=True)
+    in_file.drop(columns=non_year_fields, inplace=True)
 
-    return [{'label': i, 'value': i} for i in df.columns]
+    return [{'label': i, 'value': i} for i in in_file.columns]
 
 
 def available_through_years(available_year_list, start_year):
@@ -68,8 +72,8 @@ def basin_to_gridcell_dict(df_reference):
 def prepare_data(df, yr_list, df_ref):
     """Read in data from input file and add the basin id from a reference file.
 
-    :param in_file:                 Full path with the file name and extension to the input data file.
-    :type in_file:                  str
+    :param df:                      Processed dataframe
+    :type df:                       dataframe
 
     :param yr_list:                 List of years to process
     :type yr_list:                  list
@@ -81,10 +85,10 @@ def prepare_data(df, yr_list, df_ref):
 
     """
 
-    #read_cols = yr_list + ['id']
+    # read_cols = yr_list + ['id']
 
     # read in data for target years from file
-    #df = pd.read_csv(in_file, compression='infer', usecols=read_cols)
+    # df = pd.read_csv(in_file, compression='infer', usecols=read_cols)
 
     # get dictionary of grid id to basin id
     grid_basin_dict = basin_to_gridcell_dict(df_ref)
@@ -208,8 +212,8 @@ def plot_choropleth(df, geojson_basin):
 
     """
     fig = px.choropleth_mapbox(df, geojson=geojson_basin, locations='basin_id',
-                                      featureidkey='properties.basin_id',
-                                      color='q', color_continuous_scale="Viridis", zoom=0)
+                               featureidkey='properties.basin_id',
+                               color='q', color_continuous_scale="Viridis", zoom=0)
     fig.update_layout(mapbox_style="open-street-map")
     fig.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
     # fig = go.Figure(
@@ -269,3 +273,44 @@ def get_target_years(start, end):
     #     index_end = len(end_year_list) - 1
 
     return [str(i) for i in range(int(start), int(end) + 1)]
+
+
+def process_file(contents, filename, filedate, read_type="full"):
+    try:
+        if 'zip' in filename[0]:
+            for content, name, date in zip(contents, filename, filedate):
+                # the content needs to be split. It contains the type and the real content
+                content_type, content_string = content.split(',')
+                # Decode the base64 string
+                content_decoded = base64.b64decode(content_string)
+                # Use BytesIO to handle the decoded content
+                zip_str = io.BytesIO(content_decoded)
+                # Now you can use ZipFile to take the BytesIO output
+                zip_file = ZipFile(zip_str, 'r')
+                filename = zip_file.namelist()[0]
+            with zip_file.open(filename) as csvfile:
+                if read_type == 'years':
+                    xanthos_data = pd.read_csv(csvfile, encoding='utf8', sep=",", nrows=0)
+                else:
+                    xanthos_data = pd.read_csv(csvfile, encoding='utf8', sep=",")
+        elif 'xls' in filename[0]:
+            # Assume that the user uploaded an excel file
+            content_type, content_string = contents.split(',')
+            decoded = base64.b64decode(content_string)
+            # xanthos_data = pd.read_excel(io.BytesIO(decoded))
+        elif 'csv' in filename[0]:
+            # Assume that the user uploaded a CSV file
+            content_type, content_string = contents.split(',')
+            decoded = base64.b64decode(content_string)
+            # xanthos_data = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+    except Exception as e:
+        print(e)
+        return None
+    return xanthos_data
+
+
+def process_input_years(contents, filename, filedate):
+    file_data = process_file(contents, filename, filedate)
+    target_years = get_available_years(file_data)
+    return target_years
+
