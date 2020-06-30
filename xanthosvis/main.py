@@ -121,14 +121,14 @@ app.layout = html.Div(children=[
 @app.callback(Output("choro_graph", "figure"),
               [Input("submit_btn", 'n_clicks')], [State("upload-data", "contents"), State("upload-data", "filename"),
                                                   State("upload-data", "last_modified"),
-                                                  State("start_year", "value"), State("through_year", "value")],
+                                                  State("start_year", "value"), State("through_year", "value"), State("statistic", "value")],
               prevent_initial_call=True)
-def update_choro(click, contents, filename, filedate, start, end):
+def update_choro(click, contents, filename, filedate, start, end, statistic):
     if contents:
         xanthos_data = xvu.process_file(contents, filename, filedate)
         year_list = xvu.get_target_years(start, end)
         df = xvu.prepare_data(xanthos_data, year_list, df_ref)
-        df_per_basin = xvu.data_per_basin(df, acceptable_statistics[0], year_list)
+        df_per_basin = xvu.data_per_basin(df, statistic, year_list)
 
         data = [dict(type='choropleth',
                          geojson=basin_features,
@@ -200,7 +200,8 @@ def update_hydro(click_data, start, end, contents, filename, filedate):
         points = click_data['points']
         location = points[0]['location']
         years = xvu.get_target_years(start, end)
-        file_data = xvu.process_file(contents, filename, filedate)
+        max_basin_row = xvu.hydro_basin_lookup(location, df_ref)
+        file_data = xvu.process_file(contents, filename, filedate, max_basin_row)
         processed_data = xvu.prepare_data(file_data, years, df_ref)
         hydro_data = xvu.data_per_year_basin(processed_data, location, years)
        # new_data = xvu.data_per_year_basin(df, location, years)

@@ -22,7 +22,7 @@ def get_available_years(in_file, non_year_fields=['id']):
     """
 
     # read in only the header of the CSV
-    #df = pd.read_csv(in_file, compression='infer', nrows=0, encoding='utf8', sep=",")
+    # df = pd.read_csv(in_file, compression='infer', nrows=0, encoding='utf8', sep=",")
 
     # drop non-year fields
     in_file.drop(columns=non_year_fields, inplace=True)
@@ -275,7 +275,7 @@ def get_target_years(start, end):
     return [str(i) for i in range(int(start), int(end) + 1)]
 
 
-def process_file(contents, filename, filedate, read_type="full"):
+def process_file(contents, filename, filedate, row_count="max"):
     try:
         if 'zip' in filename[0]:
             for content, name, date in zip(contents, filename, filedate):
@@ -289,10 +289,11 @@ def process_file(contents, filename, filedate, read_type="full"):
                 zip_file = ZipFile(zip_str, 'r')
                 filename = zip_file.namelist()[0]
             with zip_file.open(filename) as csvfile:
-                if read_type == 'years':
-                    xanthos_data = pd.read_csv(csvfile, encoding='utf8', sep=",", nrows=0)
-                else:
+                if row_count == "max":
                     xanthos_data = pd.read_csv(csvfile, encoding='utf8', sep=",")
+                else:
+                    xanthos_data = pd.read_csv(csvfile, encoding='utf8', sep=",", nrows=row_count)
+
         elif 'xls' in filename[0]:
             # Assume that the user uploaded an excel file
             content_type, content_string = contents.split(',')
@@ -314,3 +315,9 @@ def process_input_years(contents, filename, filedate):
     target_years = get_available_years(file_data)
     return target_years
 
+
+def hydro_basin_lookup(basin_id, df_ref):
+    # get which grid cells are associated with the target basin
+    target_idx_list = [k for k in df_ref.keys() if df_ref[k] == basin_id]
+
+    return max(target_idx_list)
