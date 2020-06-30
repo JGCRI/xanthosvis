@@ -249,19 +249,12 @@ def plot_hydrograph(df, basin_id):
 
 
 def get_target_years(start, end):
-    # try:
-    #     index_start = start_year_list.index(start)
-    # except:
-    #     index_start = 0
-    # try:
-    #     index_end = end_year_list.index(end)
-    # except:
-    #     index_end = len(end_year_list) - 1
 
     return [str(i) for i in range(int(start), int(end) + 1)]
 
 
-def process_file(contents, filename, filedate, row_count="max"):
+def process_file(contents, filename, filedate, start=0, end=0, row_count="max"):
+    year_list = get_target_years(start, end)
     try:
         if 'zip' in filename[0]:
             for content, name, date in zip(contents, filename, filedate):
@@ -282,14 +275,20 @@ def process_file(contents, filename, filedate, row_count="max"):
 
         elif 'xls' in filename[0]:
             # Assume that the user uploaded an excel file
-            content_type, content_string = contents.split(',')
+            content_type, content_string = contents[0].split(',')
             decoded = base64.b64decode(content_string)
-            # xanthos_data = pd.read_excel(io.BytesIO(decoded))
+            if row_count == "max":
+                xanthos_data = pd.read_excel(io.BytesIO(decoded))
+            else:
+                xanthos_data = pd.read_excel(io.BytesIO(decoded), nrows=row_count)
         elif 'csv' in filename[0]:
             # Assume that the user uploaded a CSV file
-            content_type, content_string = contents.split(',')
+            content_type, content_string = contents[0].split(',')
             decoded = base64.b64decode(content_string)
-            # xanthos_data = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+            if row_count == "max":
+                xanthos_data = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+            else:
+                xanthos_data = pd.read_csv(io.StringIO(decoded.decode('utf-8')), nrows=row_count)
     except Exception as e:
         print(e)
         return None
@@ -297,7 +296,7 @@ def process_file(contents, filename, filedate, row_count="max"):
 
 
 def process_input_years(contents, filename, filedate):
-    file_data = process_file(contents, filename, filedate)
+    file_data = process_file(contents, filename, filedate, row_count=0)
     target_years = get_available_years(file_data)
     return target_years
 

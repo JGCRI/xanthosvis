@@ -9,10 +9,13 @@ import pandas as pd
 import seaborn as sns
 from dash.dependencies import Input, Output, State
 import xanthosvis.util_functions as xvu
+import plotly.graph_objs as go
 
 sns.set()
 
-app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP],
+group_colors = {"control": "light blue", "reference": "red"}
+
+app = dash.Dash(__name__, external_stylesheets=['assets/base.css', 'assets/custom.css'],
                 meta_tags=[{"name": "viewport", "content": "width=device-width"}], suppress_callback_exceptions=True)
 server = app.server
 root_dir = 'include/'
@@ -36,81 +39,191 @@ colors = {
     'text': '#7FDBFF'
 }
 
-app.layout = html.Div(children=[
-    html.Div(id="error-message"),
-    dbc.Row(
-        [
-            dbc.Col(html.Div([html.H3(className="h2-title", children="Data Upload (zip, csv, xls)"),
-                              dcc.Upload(
-                                  id='upload-data',
-                                  children=html.Div([
-                                      'Drag and Drop or ',
-                                      html.A('Select Files')
-                                  ]),
-                                  style={
-                                      'width': '100%',
-                                      'height': '60px',
-                                      'lineHeight': '60px',
-                                      'borderWidth': '1px',
-                                      'borderStyle': 'dashed',
-                                      'borderRadius': '5px',
-                                      'textAlign': 'center',
-                                      'margin': '10px'
-                                  },
-                                  # Allow multiple files to be uploaded
-                                  multiple=True
-                              ),
-                              html.Div(id='output-data-upload'),
-                              dcc.RangeSlider(
-                                  id="year_slider",
-                                  min=1960,
-                                  max=2017,
-                                  value=[1990, 2010],
-                                  className="dcc_control",
-                              ),
-                              dcc.Dropdown(
-                                  id='statistic',
-                                  options=[{'label': i, 'value': i} for i in acceptable_statistics],
-                                  value=acceptable_statistics[0], clearable=False
-                              ),
-                              dcc.Dropdown(
-                                  id='start_year',
-                                  options=[],
-                                  clearable=False
-                              ),
-                              dcc.Dropdown(
-                                  id='through_year',
-                                  options=[], clearable=False
-                              ),
-                              html.Button('View Data', id='submit_btn', n_clicks=0),
-                              ]), width=4, style={'border': '1px solid'}),
-            dbc.Col(
-                [
-                    dbc.Row(
-                        dbc.Col(html.Div([
-                            dcc.Graph(
-                                id='choro_graph',
-                                figure=dict(
-                                    data=[],
-                                    layout={})
-                            )
-                        ]), style={'border': '1px solid'})
-                    ),
-                    dbc.Row(
-                        dbc.Col(html.Div([
-                            dcc.Graph(
-                                id='hydro_graph'
-                            )
-                        ]), style={'border': '1px solid'})
-                    )
-                ],
-                width=7,
-                style={'border': '1px solid'}
-            )
-        ]
-    )
-]
+app.layout = html.Div(
+    children=[
+        html.Div(id="error-message"),
+        html.Div(
+            className="study-browser-banner row",
+            children=[
+                html.H2(className="h2-title", children="Xanthos Data Visualization"),
+                html.H2(className="h2-title-mobile", children="Xanthos Data Visualization"),
+            ],
+        ),
+        # Body of the App
+        html.Div(
+            className="row app-body",
+            children=[
+                # User Controls
+                html.Div(
+                    className="four columns card",
+                    children=[
+                        html.Div(
+                            className="bg-white user-control",
+                            children=[
+                                html.Div(
+                                    className="padding-top-bot",
+                                    children=[
+                                        html.H6("Data Upload (zip, csv, xls)"),
+                                        dcc.Upload(
+                                            id='upload-data',
+                                            children=html.Div([
+                                                'Drag and Drop or ',
+                                                html.A('Select Files')
+                                            ]),
+                                            style={
+                                                'width': '100%',
+                                                'height': '60px',
+                                                'lineHeight': '60px',
+                                                'borderWidth': '1px',
+                                                'borderStyle': 'dashed',
+                                                'borderRadius': '5px',
+                                                'textAlign': 'center',
+                                                'margin': '10px'
+                                            },
+                                            # Allow multiple files to be uploaded
+                                            multiple=True
+                                        ),
+                                    ],
+                                ),
+                                html.Div(
+                                    className="padding-top-bot",
+                                    children=[
+                                        html.H6("Choose Statistic"),
+                                        dcc.Dropdown(
+                                            id='statistic',
+                                            options=[{'label': i, 'value': i} for i in acceptable_statistics],
+                                            value=acceptable_statistics[0], clearable=False
+                                        ),
+                                    ],
+                                ),
+                                html.Div(
+                                    className="padding-top-bot",
+                                    children=[
+                                        html.H6("Choose Starting Year"),
+                                        dcc.Dropdown(
+                                            id='start_year',
+                                            options=[],
+                                            clearable=False
+                                        ),
+                                    ],
+                                ),
+                                html.Div(
+                                    className="padding-top-bot",
+                                    children=[
+                                        html.H6("Choose End Year"),
+                                        dcc.Dropdown(
+                                            id='through_year',
+                                            options=[], clearable=False
+                                        ),
+                                    ],
+                                ),
+                                html.Div(
+                                    className="padding-top-bot",
+                                    children=[
+                                        html.Button('View Data', id='submit_btn', n_clicks=0),
+                                    ],
+                                ),
+                            ],
+                        )
+                    ],
+                ),
+                # Graphs
+                html.Div(
+                    className="eight columns card-left",
+                    children=[
+                        html.Div(
+                            className="bg-white",
+                            children=[
+                                html.H5("Choro Plot"),
+                                dcc.Graph(
+                                    id='choro_graph'
+                                ),
+                                html.H5("Hydro Plot"),
+                                dcc.Graph(
+                                    id='hydro_graph'
+                                )
+                            ],
+                        )
+                    ],
+                ),
+            ],
+        ),
+    ]
 )
+
+
+#                 html.Div(
+#             dbc.Col(html.Div([html.H3(className="h2-title", children="Data Upload (zip, csv, xls)"),
+#                               dcc.Upload(
+#                                   id='upload-data',
+#                                   children=html.Div([
+#                                       'Drag and Drop or ',
+#                                       html.A('Select Files')
+#                                   ]),
+#                                   style={
+#                                       'width': '100%',
+#                                       'height': '60px',
+#                                       'lineHeight': '60px',
+#                                       'borderWidth': '1px',
+#                                       'borderStyle': 'dashed',
+#                                       'borderRadius': '5px',
+#                                       'textAlign': 'center',
+#                                       'margin': '10px'
+#                                   },
+#                                   # Allow multiple files to be uploaded
+#                                   multiple=True
+#                               ),
+#                               html.Div(id='output-data-upload'),
+#                               dcc.RangeSlider(
+#                                   id="year_slider",
+#                                   min=1960,
+#                                   max=2017,
+#                                   value=[1990, 2010],
+#                                   className="dcc_control",
+#                               ),
+#                               dcc.Dropdown(
+#                                   id='statistic',
+#                                   options=[{'label': i, 'value': i} for i in acceptable_statistics],
+#                                   value=acceptable_statistics[0], clearable=False
+#                               ),
+#                               dcc.Dropdown(
+#                                   id='start_year',
+#                                   options=[],
+#                                   clearable=False
+#                               ),
+#                               dcc.Dropdown(
+#                                   id='through_year',
+#                                   options=[], clearable=False
+#                               ),
+#                               html.Button('View Data', id='submit_btn', n_clicks=0),
+#                               ]), width=4, style={'border': '1px solid'}),
+#             dbc.Col(
+#                 [
+#                     dbc.Row(
+#                         dbc.Col(html.Div([
+#                             dcc.Graph(
+#                                 id='choro_graph',
+#                                 figure=dict(
+#                                     data=[],
+#                                     layout={})
+#                             )
+#                         ]), style={'border': '1px solid'})
+#                     ),
+#                     dbc.Row(
+#                         dbc.Col(html.Div([
+#                             dcc.Graph(
+#                                 id='hydro_graph'
+#                             )
+#                         ]), style={'border': '1px solid'})
+#                     )
+#                 ],
+#                 width=7,
+#                 style={'border': '1px solid'}
+#             )
+#         ]
+#     )
+# ]
+# )
 
 
 # Callback to generate and load the choropleth graph when user clicks load data button
@@ -123,7 +236,7 @@ app.layout = html.Div(children=[
               prevent_initial_call=True)
 def update_choro(click, contents, filename, filedate, start, end, statistic):
     if contents:
-        xanthos_data = xvu.process_file(contents, filename, filedate)
+        xanthos_data = xvu.process_file(contents, filename, filedate, start, end)
         year_list = xvu.get_target_years(start, end)
         df = xvu.prepare_data(xanthos_data, df_ref)
         df_per_basin = xvu.data_per_basin(df, statistic, year_list)
@@ -135,10 +248,18 @@ def update_choro(click, contents, filename, filedate, start, end, statistic):
                      colorscale='Viridis')]
 
         layout = dict(title='My Title')
-        return {
-            'data': data,
-            'layout': layout
-        }
+        fig = go.Figure(
+            data=data,
+            layout=go.Layout(
+                margin=go.layout.Margin(t=0, r=50, b=50, l=50),
+                yaxis=dict(title=dict(text='Lat')),
+            )
+        )
+        return fig
+        # return {
+        #     'data': data,
+        #     'layout': layout
+        # }
 
     else:
         data = []
