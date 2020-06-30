@@ -11,8 +11,8 @@ import plotly.graph_objects as go
 def get_available_years(in_file, non_year_fields=['id']):
     """Get available years from file.  Reads only the header from the file.
 
-    :params in_file:               Full path with file name and extension to the input runoff file.
-    :type in_file:                 str
+    :params in_file:               Processed file as a dataframe
+    :type in_file:                 dataframe
 
     :param non_year_fields:        list of non-year fields to drop from the file
     :type non_year_fields:         list
@@ -20,9 +20,6 @@ def get_available_years(in_file, non_year_fields=['id']):
     :return:                       list of available years as integers
 
     """
-
-    # read in only the header of the CSV
-    # df = pd.read_csv(in_file, compression='infer', nrows=0, encoding='utf8', sep=",")
 
     # drop non-year fields
     in_file.drop(columns=non_year_fields, inplace=True)
@@ -69,14 +66,11 @@ def basin_to_gridcell_dict(df_reference):
     return df_reference.to_dict()['basin_id']
 
 
-def prepare_data(df, yr_list, df_ref):
+def prepare_data(df, df_ref):
     """Read in data from input file and add the basin id from a reference file.
 
     :param df:                      Processed dataframe
     :type df:                       dataframe
-
-    :param yr_list:                 List of years to process
-    :type yr_list:                  list
 
     :param df_ref:                  Reference data frame from package
     :type df_ref:                   dataframe
@@ -84,11 +78,6 @@ def prepare_data(df, yr_list, df_ref):
     :return:                        dataframe; data with basin id
 
     """
-
-    # read_cols = yr_list + ['id']
-
-    # read in data for target years from file
-    # df = pd.read_csv(in_file, compression='infer', usecols=read_cols)
 
     # get dictionary of grid id to basin id
     grid_basin_dict = basin_to_gridcell_dict(df_ref)
@@ -154,8 +143,11 @@ def data_per_year_basin(df, basin_id, yr_list):
     :param df:                      input data having data per year
     :type df:                       dataframe
 
-    :param basin_id:                list of years to consider
-    :type basin_id:                 list
+    :param basin_id:                id of basin to filter and aggregate data for
+    :type basin_id:                 int
+
+    :param yr_list                  list of years to consider
+    :type yr_list                   list
 
     :return:                        dataframe; sum values per year for a target basin
 
@@ -208,7 +200,8 @@ def plot_choropleth(df, geojson_basin):
     :param df:                      dataframe with basin level stats
     :type df:                       dataframe
 
-    :param geojson_basin:            geojson spatial data and basin id field
+    :param geojson_basin:           geojson spatial data and basin id field
+    :type geojson_basin:
 
     """
     fig = px.choropleth_mapbox(df, geojson=geojson_basin, locations='basin_id',
@@ -216,14 +209,7 @@ def plot_choropleth(df, geojson_basin):
                                color='q', color_continuous_scale="Viridis", zoom=0)
     fig.update_layout(mapbox_style="open-street-map")
     fig.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
-    # fig = go.Figure(
-    #     data=go.Choropleth(geojson=geojson_basin, locations=df['basin_id'], z=df['q'], colorscale="Viridis"))
-    #
-    # # fig = px.choropleth(df, geojson=geojson_basin, locations='basin_id', color='q',
-    # #                     color_continuous_scale="Viridis")
-    #
-    # fig.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
-    # fig.show()
+
     return fig
 
 
@@ -318,6 +304,6 @@ def process_input_years(contents, filename, filedate):
 
 def hydro_basin_lookup(basin_id, df_ref):
     # get which grid cells are associated with the target basin
-    target_idx_list = [k for k in df_ref.keys() if df_ref[k] == basin_id]
-
-    return max(target_idx_list)
+    #target_idx_list = [k for k in df_ref.keys() if df_ref[:k] == basin_id]
+    target_idx_list = df_ref[df_ref['basin_id'] == basin_id]
+    return max(target_idx_list['grid_id'])
