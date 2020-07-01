@@ -2,7 +2,6 @@
 
 import os
 import dash
-import dash_bootstrap_components as dbc
 import dash_core_components as dcc
 import dash_html_components as html
 import pandas as pd
@@ -150,80 +149,6 @@ app.layout = html.Div(
         ),
     ]
 )
-
-
-#                 html.Div(
-#             dbc.Col(html.Div([html.H3(className="h2-title", children="Data Upload (zip, csv, xls)"),
-#                               dcc.Upload(
-#                                   id='upload-data',
-#                                   children=html.Div([
-#                                       'Drag and Drop or ',
-#                                       html.A('Select Files')
-#                                   ]),
-#                                   style={
-#                                       'width': '100%',
-#                                       'height': '60px',
-#                                       'lineHeight': '60px',
-#                                       'borderWidth': '1px',
-#                                       'borderStyle': 'dashed',
-#                                       'borderRadius': '5px',
-#                                       'textAlign': 'center',
-#                                       'margin': '10px'
-#                                   },
-#                                   # Allow multiple files to be uploaded
-#                                   multiple=True
-#                               ),
-#                               html.Div(id='output-data-upload'),
-#                               dcc.RangeSlider(
-#                                   id="year_slider",
-#                                   min=1960,
-#                                   max=2017,
-#                                   value=[1990, 2010],
-#                                   className="dcc_control",
-#                               ),
-#                               dcc.Dropdown(
-#                                   id='statistic',
-#                                   options=[{'label': i, 'value': i} for i in acceptable_statistics],
-#                                   value=acceptable_statistics[0], clearable=False
-#                               ),
-#                               dcc.Dropdown(
-#                                   id='start_year',
-#                                   options=[],
-#                                   clearable=False
-#                               ),
-#                               dcc.Dropdown(
-#                                   id='through_year',
-#                                   options=[], clearable=False
-#                               ),
-#                               html.Button('View Data', id='submit_btn', n_clicks=0),
-#                               ]), width=4, style={'border': '1px solid'}),
-#             dbc.Col(
-#                 [
-#                     dbc.Row(
-#                         dbc.Col(html.Div([
-#                             dcc.Graph(
-#                                 id='choro_graph',
-#                                 figure=dict(
-#                                     data=[],
-#                                     layout={})
-#                             )
-#                         ]), style={'border': '1px solid'})
-#                     ),
-#                     dbc.Row(
-#                         dbc.Col(html.Div([
-#                             dcc.Graph(
-#                                 id='hydro_graph'
-#                             )
-#                         ]), style={'border': '1px solid'})
-#                     )
-#                 ],
-#                 width=7,
-#                 style={'border': '1px solid'}
-#             )
-#         ]
-#     )
-# ]
-# )
 
 
 # Callback to generate and load the choropleth graph when user clicks load data button
