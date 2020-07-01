@@ -9,6 +9,7 @@ import seaborn as sns
 from dash.dependencies import Input, Output, State
 import xanthosvis.util_functions as xvu
 import plotly.graph_objs as go
+import plotly.express as px
 
 sns.set()
 
@@ -31,7 +32,9 @@ basin_json = os.path.join(root_dir, 'reference', 'gcam_basins.geojson')
 basin_features = xvu.process_geojson(basin_json)
 
 # Runoff Statistic for the Choropleth Map
-acceptable_statistics = ['mean', 'median', 'min', 'max', 'standard deviation']
+acceptable_statistics = [{'label': 'Mean', 'value': 'mean'}, {'label': 'Median', 'value': 'median'},
+                         {'label': 'Min', 'value': 'min'}, {'label': 'Max', 'value': 'max'},
+                         {'label': 'Standard Deviation', 'value': 'standard deviation'}]
 
 colors = {
     'background': '#111111',
@@ -90,8 +93,9 @@ app.layout = html.Div(
                                         html.H6("Choose Statistic"),
                                         dcc.Dropdown(
                                             id='statistic',
-                                            options=[{'label': i, 'value': i} for i in acceptable_statistics],
-                                            value=acceptable_statistics[0], clearable=False
+                                            options=[{'label': i['label'], 'value': i['value']} for i in
+                                                     acceptable_statistics],
+                                            value=acceptable_statistics[0]['value'], clearable=False
                                         ),
                                     ],
                                 ),
@@ -161,8 +165,8 @@ app.layout = html.Div(
               prevent_initial_call=True)
 def update_choro(click, contents, filename, filedate, start, end, statistic):
     if contents:
-        xanthos_data = xvu.process_file(contents, filename, filedate, start, end)
         year_list = xvu.get_target_years(start, end)
+        xanthos_data = xvu.process_file(contents, filename, filedate, years=year_list)
         df = xvu.prepare_data(xanthos_data, df_ref)
         df_per_basin = xvu.data_per_basin(df, statistic, year_list)
 
@@ -172,19 +176,18 @@ def update_choro(click, contents, filename, filedate, start, end, statistic):
                      z=df_per_basin['q'],
                      colorscale='Viridis')]
 
-        layout = dict(title='My Title')
-        fig = go.Figure(
-            data=data,
-            layout=go.Layout(
-                margin=go.layout.Margin(t=0, r=50, b=50, l=50),
-                yaxis=dict(title=dict(text='Lat')),
-            )
-        )
+        # fig = go.Figure(
+        #     data=data,
+        #     layout=go.Layout(
+        #         margin=go.layout.Margin(t=0, r=25, b=25, l=25),
+        #         yaxis=dict(title=dict(text='Lat')),
+        #     )
+        # )
+        fig = px.choropleth_mapbox(df_per_basin, geojson=basin_features, locations='basin_id',
+                                   featureidkey='properties.basin_id',
+                                   color='q', color_continuous_scale="Viridis", zoom=0, opacity=0.75)
+        fig.update_layout(mapbox_style="open-street-map")
         return fig
-        # return {
-        #     'data': data,
-        #     'layout': layout
-        # }
 
     else:
         data = []
@@ -204,10 +207,6 @@ def update_choro(click, contents, filename, filedate, start, end, statistic):
     prevent_initial_call=True
 )
 def update_options(contents, filename, filedate):
-    error_status = False
-    error_message = None
-    target_years = []
-
     # Check if there is uploaded content
     if contents:
         target_years = xvu.process_input_years(contents, filename, filedate)
@@ -241,19 +240,27 @@ def set_through_year_list(value, options, current_value):
     prevent_initial_call=True
 )
 def update_hydro(click_data, n_click, start, end, contents, filename, filedate):
-    if click_data is None:
-        location = 1
-    else:
-        points = click_data['points']
-        location = points[0]['location']
+    if contents is not None:
+        if click_data is None:
+            location = 1
+        else:
+            points = click_data['points']
+            location = points[0]['location']
 
-    years = xvu.get_target_years(start, end)
-    max_basin_row = xvu.hydro_basin_lookup(location, df_ref)
-    file_data = xvu.process_file(contents, filename, filedate, max_basin_row)
-    processed_data = xvu.prepare_data(file_data, df_ref)
-    hydro_data = xvu.data_per_year_basin(processed_data, location, years)
-    # new_data = xvu.data_per_year_basin(df, location, years)
-    return xvu.plot_hydrograph(hydro_data, location)
+        years = xvu.get_target_years(start, end)
+        max_basin_row = xvu.hydro_basin_lookup(location, df_ref)
+        file_data = xvu.process_file(contents, filename, filedate, years, max_basin_row)
+        processed_data = xvu.prepare_data(file_data, df_ref)
+        hydro_data = xvu.data_per_year_basin(processed_data, location, years)
+        return xvu.plot_hydrograph(hydro_data, location)
+    else:
+        data = []
+
+        layout = {}
+        return {
+            'data': data,
+            'layout': layout
+        }
 
 
 if __name__ == '__main__':

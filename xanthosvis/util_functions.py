@@ -242,7 +242,7 @@ def plot_hydrograph(df, basin_id):
 
     """
 
-    fig = px.line(df, x='Year', y='q', title=f"Basin {basin_id} Runoff per Year")
+    fig = px.line(df, x='Year', y='q')#, title=f"Basin {basin_id} Runoff per Year")
 
     # fig.show()
     return fig
@@ -253,8 +253,11 @@ def get_target_years(start, end):
     return [str(i) for i in range(int(start), int(end) + 1)]
 
 
-def process_file(contents, filename, filedate, start=0, end=0, row_count="max"):
-    year_list = get_target_years(start, end)
+def process_file(contents, filename, filedate, years, row_count="max"):
+    if years != 0:
+        read_cols = years + ['id']
+    else:
+        read_cols = "all"
     try:
         if 'zip' in filename[0]:
             for content, name, date in zip(contents, filename, filedate):
@@ -269,26 +272,44 @@ def process_file(contents, filename, filedate, start=0, end=0, row_count="max"):
                 filename = zip_file.namelist()[0]
             with zip_file.open(filename) as csvfile:
                 if row_count == "max":
-                    xanthos_data = pd.read_csv(csvfile, encoding='utf8', sep=",")
+                    if read_cols == "all":
+                        xanthos_data = pd.read_csv(csvfile, encoding='utf8', sep=",")
+                    else:
+                        xanthos_data = pd.read_csv(csvfile, encoding='utf8', sep=",", usecols=read_cols)
                 else:
-                    xanthos_data = pd.read_csv(csvfile, encoding='utf8', sep=",", nrows=row_count)
+                    if read_cols == "all":
+                        xanthos_data = pd.read_csv(csvfile, encoding='utf8', sep=",", nrows=row_count)
+                    else:
+                        xanthos_data = pd.read_csv(csvfile, encoding='utf8', sep=",", usecols=read_cols, nrows=row_count)
 
         elif 'xls' in filename[0]:
             # Assume that the user uploaded an excel file
             content_type, content_string = contents[0].split(',')
             decoded = base64.b64decode(content_string)
             if row_count == "max":
-                xanthos_data = pd.read_excel(io.BytesIO(decoded))
+                if read_cols == "all":
+                    xanthos_data = pd.read_excel(io.BytesIO(decoded))
+                else:
+                    xanthos_data = pd.read_excel(io.BytesIO(decoded), usecols=read_cols)
             else:
-                xanthos_data = pd.read_excel(io.BytesIO(decoded), nrows=row_count)
+                if read_cols == "all":
+                    xanthos_data = pd.read_excel(io.BytesIO(decoded), nrows=row_count)
+                else:
+                    xanthos_data = pd.read_excel(io.BytesIO(decoded), nrows=row_count, usecols=read_cols)
         elif 'csv' in filename[0]:
             # Assume that the user uploaded a CSV file
             content_type, content_string = contents[0].split(',')
             decoded = base64.b64decode(content_string)
             if row_count == "max":
-                xanthos_data = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+                if read_cols == "all":
+                    xanthos_data = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+                else:
+                    xanthos_data = pd.read_csv(io.StringIO(decoded.decode('utf-8')), usecols=read_cols)
             else:
-                xanthos_data = pd.read_csv(io.StringIO(decoded.decode('utf-8')), nrows=row_count)
+                if read_cols == "all":
+                    xanthos_data = pd.read_csv(io.StringIO(decoded.decode('utf-8')), nrows=row_count)
+                else:
+                    xanthos_data = pd.read_csv(io.StringIO(decoded.decode('utf-8')), nrows=row_count, usecols=read_cols)
     except Exception as e:
         print(e)
         return None
@@ -296,7 +317,7 @@ def process_file(contents, filename, filedate, start=0, end=0, row_count="max"):
 
 
 def process_input_years(contents, filename, filedate):
-    file_data = process_file(contents, filename, filedate, row_count=0)
+    file_data = process_file(contents, filename, filedate, years=0, row_count=0)
     target_years = get_available_years(file_data)
     return target_years
 
