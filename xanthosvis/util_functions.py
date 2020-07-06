@@ -302,14 +302,32 @@ def process_file(contents, filename, filedate, years, row_count="max"):
             decoded = base64.b64decode(content_string)
             if row_count == "max":
                 if read_cols == "all":
-                    xanthos_data = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+                    xanthos_data = pd.read_csv(io.StringIO(decoded.decode('utf-8')), error_bad_lines=False, warn_bad_lines=True)
                 else:
-                    xanthos_data = pd.read_csv(io.StringIO(decoded.decode('utf-8')), usecols=read_cols)
+                    xanthos_data = pd.read_csv(io.StringIO(decoded.decode('utf-8')), usecols=read_cols, error_bad_lines=False, warn_bad_lines=True)
             else:
                 if read_cols == "all":
-                    xanthos_data = pd.read_csv(io.StringIO(decoded.decode('utf-8')), nrows=row_count)
+                    xanthos_data = pd.read_csv(io.StringIO(decoded.decode('utf-8')), nrows=row_count, error_bad_lines=False, warn_bad_lines=True)
                 else:
-                    xanthos_data = pd.read_csv(io.StringIO(decoded.decode('utf-8')), nrows=row_count, usecols=read_cols)
+                    xanthos_data = pd.read_csv(io.StringIO(decoded.decode('utf-8')), nrows=row_count, usecols=read_cols, error_bad_lines=False, warn_bad_lines=True)
+        elif 'txt' in filename[0]:
+            # Assume that the user uploaded a CSV file
+            content_string = contents[0].split("\t")
+            decoded = base64.b64decode(content_string[0])
+            if row_count == "max":
+                if read_cols == "all":
+                    xanthos_data = pd.read_csv(io.StringIO(decoded.decode('cp1252')), error_bad_lines=False,
+                                               warn_bad_lines=True)
+                else:
+                    xanthos_data = pd.read_csv(io.StringIO(decoded.decode('cp1252')), usecols=read_cols,
+                                               error_bad_lines=False, warn_bad_lines=True)
+            else:
+                if read_cols == "all":
+                    xanthos_data = pd.read_csv(io.StringIO(decoded.decode('cp1252')), nrows=row_count,
+                                               error_bad_lines=False, warn_bad_lines=True)
+                else:
+                    xanthos_data = pd.read_csv(io.StringIO(decoded.decode('cp1252')), nrows=row_count,
+                                               usecols=read_cols, error_bad_lines=False, warn_bad_lines=True)
     except Exception as e:
         print(e)
         return None

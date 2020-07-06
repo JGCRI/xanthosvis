@@ -65,7 +65,7 @@ app.layout = html.Div(
                                 html.Div(
                                     className="padding-top-bot",
                                     children=[
-                                        html.H6("Data Upload (zip, csv, xls)"),
+                                        html.H6("Data Upload (zip, csv, xls, txt)"),
                                         dcc.Upload(
                                             id='upload-data',
                                             children=html.Div([
@@ -185,8 +185,8 @@ def update_choro(click, contents, filename, filedate, start, end, statistic):
         # )
         fig = px.choropleth_mapbox(df_per_basin, geojson=basin_features, locations='basin_id',
                                    featureidkey='properties.basin_id',
-                                   color='q', color_continuous_scale="Viridis", zoom=0, opacity=0.75)
-        fig.update_layout(mapbox_style="open-street-map")
+                                   color='q', color_continuous_scale="Viridis", zoom=0, opacity=0.7)
+        fig.update_layout(mapbox_style="carto-positron")
         return fig
 
     else:
