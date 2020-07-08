@@ -5,7 +5,6 @@ from zipfile import ZipFile
 import pandas as pd
 import plotly.express as px
 import json
-import plotly.graph_objects as go
 
 
 def get_available_years(in_file, non_year_fields=['id']):
@@ -194,7 +193,7 @@ def process_geojson(in_file):
     return basin_features
 
 
-def plot_choropleth(df, geojson_basin):
+def plot_choropleth(df_per_basin, basin_features, start, end):
     """Plot interactive choropleth map for basin level statistics.
 
     :param df:                      dataframe with basin level stats
@@ -204,30 +203,29 @@ def plot_choropleth(df, geojson_basin):
     :type geojson_basin:
 
     """
-    fig = px.choropleth_mapbox(df, geojson=geojson_basin, locations='basin_id',
+    fig = px.choropleth_mapbox(df_per_basin, geojson=basin_features, locations='basin_id',
                                featureidkey='properties.basin_id',
-                               color='q', color_continuous_scale="Viridis", zoom=0)
-    fig.update_layout(mapbox_style="open-street-map")
-    fig.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
+                               color='q', color_continuous_scale="Viridis", zoom=1, opacity=0.7)
+    fig.update_layout(
+        title={
+            'text': f"Runoff by Basin {start} - {end}",
+            'y': 0.95,
+            'x': 0.5,
+            'xanchor': 'center',
+            'yanchor': 'top'},
+        xaxis_title="Lon",
+        yaxis_title="Lat",
+    )
+    fig.update_layout(mapbox_style="carto-positron", mapbox_layers=[
+        {
+            "below": 'traces',
+            "sourcetype": "raster",
+            "source": [
+                "https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}"
+            ]
+        }
+    ])
 
-    return fig
-
-
-def update_choropleth(df, geojson_basin):
-    """Plot interactive choropleth map for basin level statistics.
-
-    :param df:                      dataframe with basin level stats
-    :type df:                       dataframe
-
-    :param geojson_file:            geojson file with spatial data and basin id field
-
-    """
-
-    fig = px.choropleth_mapbox(df, geojson=geojson_basin, locations='basin_id',
-                               featureidkey='properties.basin_id',
-                               color='q', color_continuous_scale="Viridis", zoom=0)
-    fig.update_layout(mapbox_style="open-street-map")
-    fig.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
     return fig
 
 
@@ -242,8 +240,16 @@ def plot_hydrograph(df, basin_id):
 
     """
 
-    fig = px.line(df, x='Year', y='q')#, title=f"Basin {basin_id} Runoff per Year")
-
+    df['q'] = round(df['q'], 2)
+    fig = px.line(df, x='Year', y='q', title=f"Basin {basin_id} Runoff per Year")
+    fig.update_layout(
+        title={
+            'text': f"Basin {basin_id} Runoff per Year",
+            'y': 0.9,
+            'x': 0.5,
+            'xanchor': 'center',
+            'yanchor': 'top'},
+    )
     # fig.show()
     return fig
 

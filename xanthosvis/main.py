@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-
 import os
 import dash
 import dash_core_components as dcc
@@ -20,13 +19,11 @@ app = dash.Dash(__name__, external_stylesheets=['assets/base.css', 'assets/custo
 server = app.server
 root_dir = 'include/'
 
-# Reference Files
+# --- Reference Files
 # reference file to be included in the package data
 gridcell_ref_file = os.path.join(root_dir, 'reference', 'xanthos_0p5deg_landcell_reference.csv')
-
 # read in reference file to dataframe
 df_ref = pd.read_csv(gridcell_ref_file)
-
 # reference geojson file for basins
 basin_json = os.path.join(root_dir, 'reference', 'gcam_basins.geojson')
 basin_features = xvu.process_geojson(basin_json)
@@ -90,7 +87,7 @@ app.layout = html.Div(
                                 html.Div(
                                     className="padding-top-bot",
                                     children=[
-                                        html.H6("Choose Statistic"),
+                                        html.H6("Choose Statistic:"),
                                         dcc.Dropdown(
                                             id='statistic',
                                             options=[{'label': i['label'], 'value': i['value']} for i in
@@ -102,7 +99,7 @@ app.layout = html.Div(
                                 html.Div(
                                     className="padding-top-bot",
                                     children=[
-                                        html.H6("Choose Starting Year"),
+                                        html.H6("Choose Starting Year:"),
                                         dcc.Dropdown(
                                             id='start_year',
                                             options=[],
@@ -113,7 +110,7 @@ app.layout = html.Div(
                                 html.Div(
                                     className="padding-top-bot",
                                     children=[
-                                        html.H6("Choose End Year"),
+                                        html.H6("Choose End Year:"),
                                         dcc.Dropdown(
                                             id='through_year',
                                             options=[], clearable=False
@@ -137,11 +134,11 @@ app.layout = html.Div(
                         html.Div(
                             className="bg-white",
                             children=[
-                                html.H5("Choro Plot"),
+                                # html.H5("Choro Plot"),
                                 dcc.Graph(
                                     id='choro_graph'
                                 ),
-                                html.H5("Hydro Plot"),
+                                # html.H5("Hydro Plot"),
                                 dcc.Graph(
                                     id='hydro_graph'
                                 )
@@ -156,7 +153,7 @@ app.layout = html.Div(
 
 
 # Callback to generate and load the choropleth graph when user clicks load data button
-@app.callback(Output("choro_graph", "figure"),
+@app.callback([Output("choro_graph", "figure"), Output("error-message", "children")],
               [Input("submit_btn", 'n_clicks')],
               [State("upload-data", "contents"), State("upload-data", "filename"),
                State("upload-data", "last_modified"),
@@ -164,45 +161,62 @@ app.layout = html.Div(
                State("statistic", "value")],
               prevent_initial_call=True)
 def update_choro(click, contents, filename, filedate, start, end, statistic):
+    error_message = None
     if contents:
+        if start > end:
+            error_message = html.Div(
+                className="alert",
+                children=["Invalid Years: Please choose a start year that is less than end year."],
+            )
+            return {
+                       'data': [],
+                       'layout': {}
+                   }, error_message
+
         year_list = xvu.get_target_years(start, end)
         xanthos_data = xvu.process_file(contents, filename, filedate, years=year_list)
         df = xvu.prepare_data(xanthos_data, df_ref)
         df_per_basin = xvu.data_per_basin(df, statistic, year_list)
-
-        data = [dict(type='choropleth',
-                     geojson=basin_features,
-                     locations=df_per_basin['basin_id'],
-                     z=df_per_basin['q'],
-                     colorscale='Viridis')]
-
-        # fig = go.Figure(
-        #     data=data,
-        #     layout=go.Layout(
-        #         margin=go.layout.Margin(t=0, r=25, b=25, l=25),
-        #         yaxis=dict(title=dict(text='Lat')),
-        #     )
-        # )
+        df_per_basin['q'] = round(df_per_basin['q'], 2)
         fig = px.choropleth_mapbox(df_per_basin, geojson=basin_features, locations='basin_id',
                                    featureidkey='properties.basin_id',
                                    color='q', color_continuous_scale="Viridis", zoom=0, opacity=0.7)
-        fig.update_layout(mapbox_style="carto-positron")
-        return fig
+        fig.update_layout(
+            title={
+                'text': f"Runoff by Basin {start} - {end}",
+                'y': 0.95,
+                'x': 0.5,
+                'xanchor': 'center',
+                'yanchor': 'top'},
+            xaxis_title="Lon",
+            yaxis_title="Lat",
+        )
+        fig.update_layout(mapbox_style="carto-positron", mapbox_layers=[
+            {
+                "below": 'traces',
+                "sourcetype": "raster",
+                "source": [
+                    "https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}"
+                ]
+            }
+        ])
+        # fig = xvu.plot_choropleth(basin_features, df_per_basin, start, end)
+        return fig, None
 
     else:
         data = []
 
         layout = {}
         return {
-            'data': data,
-            'layout': layout
-        }
+                   'data': data,
+                   'layout': layout
+               }, None
 
 
 # Callback to set start year options when file is uploaded
 # Also sets the data to be used
 @app.callback(
-    [Output("start_year", "options"), Output("start_year", "value")],
+    [Output("start_year", "options"), Output("start_year", "value"), Output("upload-data", "children")],
     [Input("upload-data", "contents")], [State('upload-data', 'filename'), State('upload-data', 'last_modified')],
     prevent_initial_call=True
 )
@@ -210,7 +224,9 @@ def update_options(contents, filename, filedate):
     # Check if there is uploaded content
     if contents:
         target_years = xvu.process_input_years(contents, filename, filedate)
-        return target_years, target_years[0]['value']
+        name = filename[0]
+        new_text = html.Div(["Using file " + name[:25] + '...' if (len(name) > 25) else "Using file " + name])
+        return target_years, target_years[0]['value'], new_text
 
 
 # Callback to set through year options when start year changes
@@ -241,6 +257,11 @@ def set_through_year_list(value, options, current_value):
 )
 def update_hydro(click_data, n_click, start, end, contents, filename, filedate):
     if contents is not None:
+        if start > end:
+            return {
+                       'data': [],
+                       'layout': {}
+                   }
         if click_data is None:
             location = 1
         else:
