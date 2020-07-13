@@ -1,7 +1,7 @@
 import base64
 import io
 from zipfile import ZipFile
-
+import plotly.graph_objs as go
 import pandas as pd
 import plotly.express as px
 import json
@@ -84,10 +84,11 @@ def prepare_data(df, df_ref):
     # add basin id
     df['basin_id'] = df['id'].map(grid_basin_dict)
 
+
     return df
 
 
-def data_per_basin(df, statistic, yr_list):
+def data_per_basin(df, statistic, yr_list, df_ref):
     """Generate a data frame representing data per basin for all years
     represented by an input statistic.
 
@@ -132,6 +133,8 @@ def data_per_basin(df, statistic, yr_list):
     grp.drop(columns=yr_list, inplace=True)
 
     grp.reset_index(inplace=True)
+    mapping = dict(df_ref[['basin_id', 'basin_name']].values)
+    grp['basin_name'] = grp.basin_id.map(mapping)
 
     return grp
 
@@ -229,7 +232,7 @@ def plot_choropleth(df_per_basin, basin_features, start, end):
     return fig
 
 
-def plot_hydrograph(df, basin_id):
+def plot_hydrograph(df, basin_id, df_ref):
     """Plot a hydrograph of a specific basin.
 
     :param df:                   Input dataframe with data and basin id for a target basin
@@ -241,21 +244,38 @@ def plot_hydrograph(df, basin_id):
     """
 
     df['q'] = round(df['q'], 2)
-    fig = px.line(df, x='Year', y='q', title=f"Basin {basin_id} Runoff per Year")
+    df['Runoff'] = df['q']
+    df_basin = df_ref[df_ref['basin_id'] == basin_id][0:1]
+    df_basin = df_basin['basin_name']
+    basin_name = df_basin.iat[0]
+    fig = px.line(df, x='Year', y='Runoff', title=f"Basin {basin_id} Runoff per Year")
     fig.update_layout(
         title={
-            'text': f"Basin {basin_id} Runoff per Year",
-            'y': 0.9,
-            'x': 0.5,
+            'text': f"<b>Basin {basin_id}: {basin_name} - Runoff per Year</b>",
+            'y': 0.92,
+            'x': 0.48,
             'xanchor': 'center',
-            'yanchor': 'top'},
+            'yanchor': 'top',
+            'font': dict(
+                family='Roboto',
+                size=20
+            ),
+        },
+        margin=go.layout.Margin(
+            l=30,  # left margin
+            r=60,  # right margin
+            b=70,  # bottom margin
+            t=70  # top margin
+        ),
+
     )
+    fig.update_xaxes(title_text='Year')
+    fig.update_yaxes(title_text='km³/yr')
     # fig.show()
     return fig
 
 
 def get_target_years(start, end):
-
     return [str(i) for i in range(int(start), int(end) + 1)]
 
 
@@ -286,7 +306,8 @@ def process_file(contents, filename, filedate, years, row_count="max"):
                     if read_cols == "all":
                         xanthos_data = pd.read_csv(csvfile, encoding='utf8', sep=",", nrows=row_count)
                     else:
-                        xanthos_data = pd.read_csv(csvfile, encoding='utf8', sep=",", usecols=read_cols, nrows=row_count)
+                        xanthos_data = pd.read_csv(csvfile, encoding='utf8', sep=",", usecols=read_cols,
+                                                   nrows=row_count)
 
         elif 'xls' in filename[0]:
             # Assume that the user uploaded an excel file
@@ -308,14 +329,18 @@ def process_file(contents, filename, filedate, years, row_count="max"):
             decoded = base64.b64decode(content_string)
             if row_count == "max":
                 if read_cols == "all":
-                    xanthos_data = pd.read_csv(io.StringIO(decoded.decode('utf-8')), error_bad_lines=False, warn_bad_lines=True)
+                    xanthos_data = pd.read_csv(io.StringIO(decoded.decode('utf-8')), error_bad_lines=False,
+                                               warn_bad_lines=True)
                 else:
-                    xanthos_data = pd.read_csv(io.StringIO(decoded.decode('utf-8')), usecols=read_cols, error_bad_lines=False, warn_bad_lines=True)
+                    xanthos_data = pd.read_csv(io.StringIO(decoded.decode('utf-8')), usecols=read_cols,
+                                               error_bad_lines=False, warn_bad_lines=True)
             else:
                 if read_cols == "all":
-                    xanthos_data = pd.read_csv(io.StringIO(decoded.decode('utf-8')), nrows=row_count, error_bad_lines=False, warn_bad_lines=True)
+                    xanthos_data = pd.read_csv(io.StringIO(decoded.decode('utf-8')), nrows=row_count,
+                                               error_bad_lines=False, warn_bad_lines=True)
                 else:
-                    xanthos_data = pd.read_csv(io.StringIO(decoded.decode('utf-8')), nrows=row_count, usecols=read_cols, error_bad_lines=False, warn_bad_lines=True)
+                    xanthos_data = pd.read_csv(io.StringIO(decoded.decode('utf-8')), nrows=row_count, usecols=read_cols,
+                                               error_bad_lines=False, warn_bad_lines=True)
         elif 'txt' in filename[0]:
             # Assume that the user uploaded a CSV file
             content_string = contents[0].split("\t")
@@ -348,6 +373,6 @@ def process_input_years(contents, filename, filedate):
 
 def hydro_basin_lookup(basin_id, df_ref):
     # get which grid cells are associated with the target basin
-    #target_idx_list = [k for k in df_ref.keys() if df_ref[:k] == basin_id]
+    # target_idx_list = [k for k in df_ref.keys() if df_ref[:k] == basin_id]
     target_idx_list = df_ref[df_ref['basin_id'] == basin_id]
     return max(target_idx_list['grid_id'])

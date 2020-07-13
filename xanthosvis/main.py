@@ -45,6 +45,16 @@ app.layout = html.Div(
             className="study-browser-banner row",
             children=[
                 html.H2(className="h2-title", children="Xanthos Data Visualization"),
+                html.Div(
+                    className="div-logo",
+                    children=[
+                        html.A([
+                            html.Img(className="logo", src=app.get_asset_url("gcims_logo.svg")
+                                     ),
+                        ],
+                            href="https://gcims.pnnl.gov/global-change-intersectoral-modeling-system", target="blank",
+                        ),
+                    ]),
                 html.H2(className="h2-title-mobile", children="Xanthos Data Visualization"),
             ],
         ),
@@ -62,7 +72,7 @@ app.layout = html.Div(
                                 html.Div(
                                     className="padding-top-bot",
                                     children=[
-                                        html.H6("Data Upload (zip, csv, xls, txt)"),
+                                        html.H6("Data Upload (File Types: .csv, zipped .csv)"),
                                         dcc.Upload(
                                             id='upload-data',
                                             children=html.Div([
@@ -76,8 +86,7 @@ app.layout = html.Div(
                                                 'borderWidth': '1px',
                                                 'borderStyle': 'dashed',
                                                 'borderRadius': '5px',
-                                                'textAlign': 'center',
-                                                'margin': '10px'
+                                                'textAlign': 'center'
                                             },
                                             # Allow multiple files to be uploaded
                                             multiple=True
@@ -122,6 +131,13 @@ app.layout = html.Div(
                                     children=[
                                         html.Button('View Data', id='submit_btn', n_clicks=0),
                                     ],
+                                ),
+                                html.Div(
+                                    className="padding-top-bot",
+                                    children=[
+                                        html.A(["Find Xanthos on GitHub"], href="https://github.com/JGCRI/xanthos",
+                                               target="blank")
+                                    ]
                                 ),
                             ],
                         )
@@ -176,20 +192,34 @@ def update_choro(click, contents, filename, filedate, start, end, statistic):
         year_list = xvu.get_target_years(start, end)
         xanthos_data = xvu.process_file(contents, filename, filedate, years=year_list)
         df = xvu.prepare_data(xanthos_data, df_ref)
-        df_per_basin = xvu.data_per_basin(df, statistic, year_list)
-        df_per_basin['q'] = round(df_per_basin['q'], 2)
+        df_per_basin = xvu.data_per_basin(df, statistic, year_list, df_ref)
+        df_per_basin['Runoff (km³)'] = round(df_per_basin['q'], 2)
+        df_per_basin['Runoff (km³)'] = pd.cut(df_per_basin['Runoff (km³)'], range(0, max(df_per_basin['Runoff (km³)']),
+                                                                                  10), right=False,)
         fig = px.choropleth_mapbox(df_per_basin, geojson=basin_features, locations='basin_id',
-                                   featureidkey='properties.basin_id',
-                                   color='q', color_continuous_scale="Viridis", zoom=0, opacity=0.7)
+                                   featureidkey='properties.basin_id', hover_name='basin_name',
+                                   color='Runoff (km³)', color_discrete_sequence=px.colors.sequential.Plasma_r, zoom=1,
+                                   opacity=0.7)
         fig.update_layout(
             title={
-                'text': f"Runoff by Basin {start} - {end}",
-                'y': 0.95,
+                'text': f"<b>Runoff by Basin {start} - {end}</b>",
+                'y': 0.94,
                 'x': 0.5,
                 'xanchor': 'center',
-                'yanchor': 'top'},
+                'yanchor': 'top',
+                'font': dict(
+                    family='Roboto',
+                    size=20
+                ),
+            },
             xaxis_title="Lon",
             yaxis_title="Lat",
+            margin=go.layout.Margin(
+                l=30,  # left margin
+                r=10,  # right margin
+                b=10,  # bottom margin
+                t=60  # top margin
+            ),
         )
         fig.update_layout(mapbox_style="carto-positron", mapbox_layers=[
             {
@@ -200,7 +230,7 @@ def update_choro(click, contents, filename, filedate, start, end, statistic):
                 ]
             }
         ])
-        # fig = xvu.plot_choropleth(basin_features, df_per_basin, start, end)
+        # fig.update_coloraxes(cmid = 2000)
         return fig, None
 
     else:
@@ -259,9 +289,9 @@ def update_hydro(click_data, n_click, start, end, contents, filename, filedate):
     if contents is not None:
         if start > end:
             return {
-                       'data': [],
-                       'layout': {}
-                   }
+                'data': [],
+                'layout': {}
+            }
         if click_data is None:
             location = 1
         else:
@@ -273,7 +303,7 @@ def update_hydro(click_data, n_click, start, end, contents, filename, filedate):
         file_data = xvu.process_file(contents, filename, filedate, years, max_basin_row)
         processed_data = xvu.prepare_data(file_data, df_ref)
         hydro_data = xvu.data_per_year_basin(processed_data, location, years)
-        return xvu.plot_hydrograph(hydro_data, location)
+        return xvu.plot_hydrograph(hydro_data, location, df_ref)
     else:
         data = []
 

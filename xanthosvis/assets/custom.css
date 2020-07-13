@@ -32,7 +32,7 @@ body{
   display: inline-block;
   letter-spacing: 3.8px;
   font-weight: 800;
-  font-size: 20px;
+  font-size: 28px;
 }
 
 .h2-title-mobile{
@@ -61,12 +61,12 @@ h5{
 
 .bg-white{
   background-color: white;
-  padding: 12px 18px;
+  padding: 8px 12px;
   /*height: 500px;*/
 }
 
 .app-body{
-  margin-left: 4%;
+  margin-left: 3%;
 }
 
 .card{
