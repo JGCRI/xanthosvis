@@ -284,6 +284,15 @@ def process_file(contents, filename, filedate, years, row_count="max"):
         read_cols = years + ['id']
     else:
         read_cols = "all"
+    f = filename[0]
+    split = f.split('_')
+    units = ""
+    if len(split) > 1:
+        units = split[1]
+    else:
+        unit_display = "km^3/yr"
+    if units == 'km3peryear':
+        unit_display = 'Km^3/yr'
     try:
         if 'zip' in filename[0]:
             for content, name, date in zip(contents, filename, filedate):
@@ -362,11 +371,11 @@ def process_file(contents, filename, filedate, years, row_count="max"):
     except Exception as e:
         print(e)
         return None
-    return xanthos_data
+    return [xanthos_data, unit_display]
 
 
 def process_input_years(contents, filename, filedate):
-    file_data = process_file(contents, filename, filedate, years=0, row_count=0)
+    file_data = process_file(contents, filename, filedate, years=0, row_count=0)[0]
     target_years = get_available_years(file_data)
     return target_years
 

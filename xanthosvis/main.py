@@ -19,6 +19,9 @@ app = dash.Dash(__name__, external_stylesheets=['assets/base.css', 'assets/custo
 server = app.server
 root_dir = 'include/'
 
+# Access Token for Mapbox
+mapbox_token = open("include/mapbox-token").read()
+
 # --- Reference Files
 # reference file to be included in the package data
 gridcell_ref_file = os.path.join(root_dir, 'reference', 'xanthos_0p5deg_landcell_reference.csv')
@@ -136,7 +139,7 @@ app.layout = html.Div(
                                     className="padding-top-bot",
                                     children=[
                                         html.A(["Find Xanthos on GitHub"], href="https://github.com/JGCRI/xanthos",
-                                               target="blank")
+                                               target="blank", className="a-xanthos-link")
                                     ]
                                 ),
                             ],
@@ -150,9 +153,24 @@ app.layout = html.Div(
                         html.Div(
                             className="bg-white",
                             children=[
+                                dcc.Loading(
+                                    id="loader",
+                                    type="default",
+                                    children=html.Div(id="loading-output",
+                                                      style={
+                                                          'z-index': '2',
+                                                          'width': '100%',
+                                                          'height': '100%',
+                                                          'top': '100px',
+                                                          'textAlign': 'center'
+                                                      })
+                                ),
                                 # html.H5("Choro Plot"),
                                 dcc.Graph(
-                                    id='choro_graph'
+                                    id='choro_graph',
+                                    style={
+                                        'z-index': '2'
+                                    }
                                 ),
                                 # html.H5("Hydro Plot"),
                                 dcc.Graph(
@@ -169,7 +187,7 @@ app.layout = html.Div(
 
 
 # Callback to generate and load the choropleth graph when user clicks load data button
-@app.callback([Output("choro_graph", "figure"), Output("error-message", "children")],
+@app.callback([Output("choro_graph", "figure"), Output("error-message", "children"), Output("loader", "children")],
               [Input("submit_btn", 'n_clicks')],
               [State("upload-data", "contents"), State("upload-data", "filename"),
                State("upload-data", "last_modified"),
@@ -190,7 +208,9 @@ def update_choro(click, contents, filename, filedate, start, end, statistic):
                    }, error_message
 
         year_list = xvu.get_target_years(start, end)
-        xanthos_data = xvu.process_file(contents, filename, filedate, years=year_list)
+        data = xvu.process_file(contents, filename, filedate, years=year_list)
+        xanthos_data = data[0]
+        units = data[1]
         df = xvu.prepare_data(xanthos_data, df_ref)
         df_per_basin = xvu.data_per_basin(df, statistic, year_list, df_ref)
         df_per_basin['Runoff (km³)'] = round(df_per_basin['q'], 2)
@@ -198,7 +218,7 @@ def update_choro(click, contents, filename, filedate, start, end, statistic):
         #                                                                           10), right=False, )
         fig = px.choropleth_mapbox(df_per_basin, geojson=basin_features, locations='basin_id',
                                    featureidkey='properties.basin_id', hover_name='basin_name',
-                                   color='Runoff (km³)', color_continuous_scale="Viridis", zoom=1, opacity=0.7)
+                                   color='Runoff (km³)', color_continuous_scale="Viridis", zoom=0, opacity=0.7)
         fig.update_layout(
             title={
                 'text': f"<b>Runoff by Basin {start} - {end}</b>",
@@ -220,17 +240,10 @@ def update_choro(click, contents, filename, filedate, start, end, statistic):
                 t=60  # top margin
             ),
         )
-        fig.update_layout(mapbox_style="carto-positron", mapbox_layers=[
-            {
-                "below": 'traces',
-                "sourcetype": "raster",
-                "source": [
-                    "https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}"
-                ]
-            }
-        ])
+        fig.update_layout(mapbox_style="mapbox://styles/jevanoff/ckckto2j900k01iomsh1f8i20",
+                          mapbox_accesstoken=mapbox_token)
 
-        return fig, None
+        return fig, None, None
 
     else:
         data = []
@@ -239,7 +252,7 @@ def update_choro(click, contents, filename, filedate, start, end, statistic):
         return {
                    'data': data,
                    'layout': layout
-               }, None
+               }, None, None
 
 
 # Callback to set start year options when file is uploaded
@@ -299,7 +312,7 @@ def update_hydro(click_data, n_click, start, end, contents, filename, filedate):
 
         years = xvu.get_target_years(start, end)
         max_basin_row = xvu.hydro_basin_lookup(location, df_ref)
-        file_data = xvu.process_file(contents, filename, filedate, years, max_basin_row)
+        file_data = xvu.process_file(contents, filename, filedate, years, max_basin_row)[0]
         processed_data = xvu.prepare_data(file_data, df_ref)
         hydro_data = xvu.data_per_year_basin(processed_data, location, years)
         return xvu.plot_hydrograph(hydro_data, location, df_ref)

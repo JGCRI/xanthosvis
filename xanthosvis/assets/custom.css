@@ -9,6 +9,26 @@ body{
   color: #203cb3;
 }
 
+*[data-dash-is-loading="true"]{
+    visibility: hidden;
+}
+*[data-dash-is-loading="true"]::before{
+    content: "Loading...";
+    display: inline-block;
+    color:crimson;
+    visibility: visible;
+}
+
+.a-xanthos-link
+{
+	 background: rgb(2,21,70);
+	color:white;
+	display: block;
+	text-decoration: none;
+	padding-left: 10px;
+}
+
+
 .study-browser-banner {
   background: rgb(2,21,70);
   color: white;
@@ -72,11 +92,13 @@ h5{
 .card{
   padding:32px 20px 32px 20px;
   margin-left: 4%;
+	border-radius: 15px;
 }
 
 .card-left{
   padding:32px 20px 32px 20px;
   margin-left: 0px;
+	border-radius: 15px;
 }
 
 .padding-top-bot{
@@ -163,8 +185,8 @@ h5{
     margin-left: 0px;
   }
 
-  .four.columns                   { width: 100%; }
-  .eight.columns                  { width: 100%; }
+  .four.columns                   { width: 100%; border-radius: 25px; }
+  .eight.columns                  { width: 100%; border-radius: 25px; }
 
   .columns{
     text-align: center;
