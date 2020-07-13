@@ -194,12 +194,11 @@ def update_choro(click, contents, filename, filedate, start, end, statistic):
         df = xvu.prepare_data(xanthos_data, df_ref)
         df_per_basin = xvu.data_per_basin(df, statistic, year_list, df_ref)
         df_per_basin['Runoff (km³)'] = round(df_per_basin['q'], 2)
-        df_per_basin['Runoff (km³)'] = pd.cut(df_per_basin['Runoff (km³)'], range(0, max(df_per_basin['Runoff (km³)']),
-                                                                                  10), right=False,)
+        # df_per_basin['Runoff (km³)'] = pd.cut(df_per_basin['Runoff (km³)'], range(0, max(df_per_basin['Runoff (km³)']),
+        #                                                                           10), right=False, )
         fig = px.choropleth_mapbox(df_per_basin, geojson=basin_features, locations='basin_id',
                                    featureidkey='properties.basin_id', hover_name='basin_name',
-                                   color='Runoff (km³)', color_discrete_sequence=px.colors.sequential.Plasma_r, zoom=1,
-                                   opacity=0.7)
+                                   color='Runoff (km³)', color_continuous_scale="Viridis", zoom=1, opacity=0.7)
         fig.update_layout(
             title={
                 'text': f"<b>Runoff by Basin {start} - {end}</b>",
@@ -230,7 +229,7 @@ def update_choro(click, contents, filename, filedate, start, end, statistic):
                 ]
             }
         ])
-        # fig.update_coloraxes(cmid = 2000)
+
         return fig, None
 
     else:
