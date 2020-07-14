@@ -150,9 +150,39 @@ app.layout = html.Div(
                 html.Div(
                     className="eight columns card-left",
                     children=[
-                        html.Div(
-                            className="bg-white",
-                            children=[
+                        dcc.Tabs(id='tabs', value="info_tab", children=[
+                            dcc.Tab(label='Information', value='info_tab', children=[
+                                html.Div(id='tab1_content', className="bg-white",
+                                         style={'height': '100%', 'min-height': '450px'}, children=[
+                                        html.H6("How to Use the System:"),
+                                        html.Ol(children=[
+                                            html.Li("Use the 'Data Upload' component to upload Xanthos output data"),
+                                            html.Li("Choose the statistic you would like to view"),
+                                            html.Li(
+                                                "Choose the year range from the available start/end years (calculated "
+                                                "from data upload)"),
+                                            html.Li(
+                                                "Click the 'View Data' button (also click again if there are changes "
+                                                "to any of the fields)")
+                                        ]),
+                                    ]),
+                            ]),
+                            dcc.Tab(label='Output', value='output_tab', children=[
+                                dcc.Graph(
+                                    id='choro_graph', figure={
+                                        'layout': {
+                                            'title': 'Runoff by Basin (Load data and click "View Data")'
+                                        }
+                                    }
+                                ),
+                                # html.H5("Hydro Plot"),
+                                dcc.Graph(
+                                    id='hydro_graph', figure={
+                                        'layout': {
+                                            'title': 'Single Basin Data per Year (Load data and click "View Data")'
+                                        }
+                                    }
+                                ),
                                 dcc.Loading(
                                     id="loader",
                                     type="default",
@@ -161,23 +191,40 @@ app.layout = html.Div(
                                                           'z-index': '2',
                                                           'width': '100%',
                                                           'height': '100%',
-                                                          'top': '100px',
-                                                          'textAlign': 'center'
+                                                          'textAlign': 'center',
+                                                          'background-color': 'white'
                                                       })
                                 ),
-                                # html.H5("Choro Plot"),
-                                dcc.Graph(
-                                    id='choro_graph',
-                                    style={
-                                        'z-index': '2'
-                                    }
-                                ),
-                                # html.H5("Hydro Plot"),
-                                dcc.Graph(
-                                    id='hydro_graph'
-                                )
-                            ],
-                        )
+                            ]),
+                        ]),
+                        # html.Div(
+                        #     className="bg-white",
+                        #     children=[
+                        # dcc.Loading(
+                        #     id="loader",
+                        #     type="default",
+                        #     children=html.Div(id="loading-output",
+                        #                       style={
+                        #                           'z-index': '2',
+                        #                           'width': '100%',
+                        #                           'height': '100%',
+                        #                           'top': '100px',
+                        #                           'textAlign': 'center'
+                        #                       })
+                        # ),
+                        # html.H5("Choro Plot"),
+                        # dcc.Graph(
+                        #     id='choro_graph',
+                        #     style={
+                        #         'z-index': '2'
+                        #     }
+                        # ),
+                        # # html.H5("Hydro Plot"),
+                        # dcc.Graph(
+                        #     id='hydro_graph'
+                        # )
+                        #     ],
+                        # )
                     ],
                 ),
             ],
@@ -187,7 +234,8 @@ app.layout = html.Div(
 
 
 # Callback to generate and load the choropleth graph when user clicks load data button
-@app.callback([Output("choro_graph", "figure"), Output("error-message", "children"), Output("loader", "children")],
+@app.callback([Output("choro_graph", "figure"), Output("error-message", "children"), Output("loader", "children"),
+               Output("tabs", "value")],
               [Input("submit_btn", 'n_clicks')],
               [State("upload-data", "contents"), State("upload-data", "filename"),
                State("upload-data", "last_modified"),
@@ -243,7 +291,7 @@ def update_choro(click, contents, filename, filedate, start, end, statistic):
         fig.update_layout(mapbox_style="mapbox://styles/jevanoff/ckckto2j900k01iomsh1f8i20",
                           mapbox_accesstoken=mapbox_token)
 
-        return fig, None, None
+        return fig, None, None, 'output_tab'
 
     else:
         data = []
@@ -252,7 +300,7 @@ def update_choro(click, contents, filename, filedate, start, end, statistic):
         return {
                    'data': data,
                    'layout': layout
-               }, None, None
+               }, None, None, "info_tab"
 
 
 # Callback to set start year options when file is uploaded
