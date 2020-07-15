@@ -9,6 +9,7 @@ from dash.dependencies import Input, Output, State
 import xanthosvis.util_functions as xvu
 import plotly.graph_objs as go
 import plotly.express as px
+import numpy as np
 
 sns.set()
 
@@ -150,53 +151,58 @@ app.layout = html.Div(
                 html.Div(
                     className="eight columns card-left",
                     children=[
-                        dcc.Tabs(id='tabs', value="info_tab", children=[
-                            dcc.Tab(label='Information', value='info_tab', children=[
-                                html.Div(id='tab1_content', className="bg-white",
-                                         style={'height': '100%', 'min-height': '450px'}, children=[
-                                        html.H6("How to Use the System:"),
-                                        html.Ol(children=[
-                                            html.Li("Use the 'Data Upload' component to upload Xanthos output data"),
-                                            html.Li("Choose the statistic you would like to view"),
-                                            html.Li(
-                                                "Choose the year range from the available start/end years (calculated "
-                                                "from data upload)"),
-                                            html.Li(
-                                                "Click the 'View Data' button (also click again if there are changes "
-                                                "to any of the fields)")
-                                        ]),
+                        dcc.Tabs(id='tabs', value="info_tab", parent_className='custom-tabs',
+                                 className='custom-tabs-container', children=[
+                                dcc.Tab(label='Instructions', value='info_tab', className='custom-tab',
+                                        selected_className='custom-tab--selected', children=[
+                                        html.Div(id='tab1_content', className="bg-white",
+                                                 style={'height': '100%', 'min-height': '490px', 'padding-top': '20px',
+                                                        'padding-left': '15px'}, children=[
+                                                html.H6("How to Use the System:"),
+                                                html.Ol(children=[
+                                                    html.Li(
+                                                        "Use the 'Data Upload' component to upload Xanthos output data"),
+                                                    html.Li("Choose the statistic you would like to view"),
+                                                    html.Li(
+                                                        "Choose the year range from the available start/end years (calculated "
+                                                        "from data upload)"),
+                                                    html.Li(
+                                                        "Click the 'View Data' button (also click again if there are changes "
+                                                        "to any of the fields)")
+                                                ]),
+                                            ]),
+                                    ]),
+                                dcc.Tab(label='Output', value='output_tab', className='custom-tab',
+                                        selected_className='custom-tab--selected', children=[
+                                        dcc.Graph(
+                                            id='choro_graph', figure={
+                                                'layout': {
+                                                    'title': 'Runoff by Basin (Load data and click "View Data")'
+                                                }
+                                            }
+                                        ),
+                                        # html.H5("Hydro Plot"),
+                                        dcc.Graph(
+                                            id='hydro_graph', figure={
+                                                'layout': {
+                                                    'title': 'Single Basin Data per Year (Load data and click "View Data")'
+                                                }
+                                            }
+                                        ),
+                                        dcc.Loading(
+                                            id="loader",
+                                            type="default",
+                                            children=html.Div(id="loading-output",
+                                                              style={
+                                                                  'z-index': '2',
+                                                                  'width': '100%',
+                                                                  'height': '100%',
+                                                                  'textAlign': 'center',
+                                                                  'background-color': 'white'
+                                                              })
+                                        ),
                                     ]),
                             ]),
-                            dcc.Tab(label='Output', value='output_tab', children=[
-                                dcc.Graph(
-                                    id='choro_graph', figure={
-                                        'layout': {
-                                            'title': 'Runoff by Basin (Load data and click "View Data")'
-                                        }
-                                    }
-                                ),
-                                # html.H5("Hydro Plot"),
-                                dcc.Graph(
-                                    id='hydro_graph', figure={
-                                        'layout': {
-                                            'title': 'Single Basin Data per Year (Load data and click "View Data")'
-                                        }
-                                    }
-                                ),
-                                dcc.Loading(
-                                    id="loader",
-                                    type="default",
-                                    children=html.Div(id="loading-output",
-                                                      style={
-                                                          'z-index': '2',
-                                                          'width': '100%',
-                                                          'height': '100%',
-                                                          'textAlign': 'center',
-                                                          'background-color': 'white'
-                                                      })
-                                ),
-                            ]),
-                        ]),
                         # html.Div(
                         #     className="bg-white",
                         #     children=[
@@ -262,11 +268,14 @@ def update_choro(click, contents, filename, filedate, start, end, statistic):
         df = xvu.prepare_data(xanthos_data, df_ref)
         df_per_basin = xvu.data_per_basin(df, statistic, year_list, df_ref)
         df_per_basin['Runoff (km³)'] = round(df_per_basin['q'], 2)
-        # df_per_basin['Runoff (km³)'] = pd.cut(df_per_basin['Runoff (km³)'], range(0, max(df_per_basin['Runoff (km³)']),
+        #df_per_basin['plot_cut'] = pd.cut(df_per_basin['Runoff (km³)'], 6)
+        # df_per_basin['cut'] = pd.cut(df_per_basin['q'],
+        #                              bins=np.linspace(0,
+        #                                               max(df_per_basin['q'])+1, 24))
         #                                                                           10), right=False, )
         fig = px.choropleth_mapbox(df_per_basin, geojson=basin_features, locations='basin_id',
                                    featureidkey='properties.basin_id', hover_name='basin_name',
-                                   color='Runoff (km³)', color_continuous_scale="Viridis", zoom=0, opacity=0.7)
+                                   color='Runoff (km³)', color_continuous_scale='Plasma',  zoom=0.5, opacity=0.7)
         fig.update_layout(
             title={
                 'text': f"<b>Runoff by Basin {start} - {end}</b>",
@@ -331,7 +340,10 @@ def set_through_year_list(value, options, current_value):
         new_value = options[len(options) - 1]['value']
     else:
         year_list = xvu.available_through_years(options, value)
-        new_value = current_value
+        if len([i for i in options if i['value'] == current_value]) >= 1:
+            new_value = current_value
+        else:
+            new_value = options[len(options) - 1]['value']
 
     return year_list, new_value
 
