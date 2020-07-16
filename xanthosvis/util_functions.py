@@ -249,6 +249,7 @@ def plot_hydrograph(df, basin_id, df_ref):
     df_basin = df_basin['basin_name']
     basin_name = df_basin.iat[0]
     fig = px.line(df, x='Year', y='Runoff', title=f"Basin {basin_id} Runoff per Year")
+    fig.update_xaxes(nticks=len(df))
     fig.update_layout(
         title={
             'text': f"<b>Basin {basin_id}: {basin_name} - Runoff per Year</b>",

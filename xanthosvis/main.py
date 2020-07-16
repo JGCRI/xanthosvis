@@ -137,9 +137,10 @@ app.layout = html.Div(
                                     ],
                                 ),
                                 html.Div(
-                                    className="padding-top-bot",
+                                    className="xanthos-div",
                                     children=[
-                                        html.A(["Find Xanthos on GitHub"], href="https://github.com/JGCRI/xanthos",
+                                        html.A([html.Img(src="assets/GitHub-Mark-Light-32px.png", className="xanthos-img"),"Find Xanthos on GitHub"],
+                                               href="https://github.com/JGCRI/xanthos",
                                                target="blank", className="a-xanthos-link")
                                     ]
                                 ),
@@ -174,63 +175,24 @@ app.layout = html.Div(
                                     ]),
                                 dcc.Tab(label='Output', value='output_tab', className='custom-tab',
                                         selected_className='custom-tab--selected', children=[
-                                        dcc.Graph(
-                                            id='choro_graph', figure={
-                                                'layout': {
-                                                    'title': 'Runoff by Basin (Load data and click "View Data")'
+                                        dcc.Loading(id='choro_loader', children=[
+                                            dcc.Graph(
+                                                id='choro_graph', figure={
+                                                    'layout': {
+                                                        'title': 'Runoff by Basin (Upload data and click "View Data")'
+                                                    }
+                                                }, config={'modeBarButtonsToRemove': ['select2d', 'lasso2d']}
+                                        )]),
+                                        dcc.Loading(id='hydro_loader', children=[
+                                            dcc.Graph(
+                                                id='hydro_graph', figure={
+                                                    'layout': {
+                                                        'title': 'Single Basin Runoff per Year (Click on a basin)'
+                                                    }
                                                 }
-                                            }
-                                        ),
-                                        # html.H5("Hydro Plot"),
-                                        dcc.Graph(
-                                            id='hydro_graph', figure={
-                                                'layout': {
-                                                    'title': 'Single Basin Data per Year (Load data and click "View Data")'
-                                                }
-                                            }
-                                        ),
-                                        dcc.Loading(
-                                            id="loader",
-                                            type="default",
-                                            children=html.Div(id="loading-output",
-                                                              style={
-                                                                  'z-index': '2',
-                                                                  'width': '100%',
-                                                                  'height': '100%',
-                                                                  'textAlign': 'center',
-                                                                  'background-color': 'white'
-                                                              })
-                                        ),
+                                        )]),
                                     ]),
                             ]),
-                        # html.Div(
-                        #     className="bg-white",
-                        #     children=[
-                        # dcc.Loading(
-                        #     id="loader",
-                        #     type="default",
-                        #     children=html.Div(id="loading-output",
-                        #                       style={
-                        #                           'z-index': '2',
-                        #                           'width': '100%',
-                        #                           'height': '100%',
-                        #                           'top': '100px',
-                        #                           'textAlign': 'center'
-                        #                       })
-                        # ),
-                        # html.H5("Choro Plot"),
-                        # dcc.Graph(
-                        #     id='choro_graph',
-                        #     style={
-                        #         'z-index': '2'
-                        #     }
-                        # ),
-                        # # html.H5("Hydro Plot"),
-                        # dcc.Graph(
-                        #     id='hydro_graph'
-                        # )
-                        #     ],
-                        # )
                     ],
                 ),
             ],
@@ -240,8 +202,7 @@ app.layout = html.Div(
 
 
 # Callback to generate and load the choropleth graph when user clicks load data button
-@app.callback([Output("choro_graph", "figure"), Output("error-message", "children"), Output("loader", "children"),
-               Output("tabs", "value")],
+@app.callback(Output("choro_graph", "figure"),#, Output("tabs", "value")],
               [Input("submit_btn", 'n_clicks')],
               [State("upload-data", "contents"), State("upload-data", "filename"),
                State("upload-data", "last_modified"),
@@ -268,14 +229,25 @@ def update_choro(click, contents, filename, filedate, start, end, statistic):
         df = xvu.prepare_data(xanthos_data, df_ref)
         df_per_basin = xvu.data_per_basin(df, statistic, year_list, df_ref)
         df_per_basin['Runoff (km³)'] = round(df_per_basin['q'], 2)
-        #df_per_basin['plot_cut'] = pd.cut(df_per_basin['Runoff (km³)'], 6)
+        # df_per_basin['plot_cut'] = pd.cut(df_per_basin['Runoff (km³)'], 6)
         # df_per_basin['cut'] = pd.cut(df_per_basin['q'],
         #                              bins=np.linspace(0,
         #                                               max(df_per_basin['q'])+1, 24))
         #                                                                           10), right=False, )
-        fig = px.choropleth_mapbox(df_per_basin, geojson=basin_features, locations='basin_id',
-                                   featureidkey='properties.basin_id', hover_name='basin_name',
-                                   color='Runoff (km³)', color_continuous_scale='Plasma',  zoom=0.5, opacity=0.7)
+        # fig = px.choropleth_mapbox(df_per_basin, geojson=basin_features, locations='basin_id',
+        #                            featureidkey='properties.basin_id', hover_name='basin_name',
+        #                            color='Runoff (km³)', color_continuous_scale='Plasma', zoom=0.5, opacity=0.7,
+        #                            color)
+        fig = go.Figure(go.Choroplethmapbox(geojson=basin_features, locations=df_per_basin.basin_id,
+                                            z=df_per_basin['Runoff (km³)'], marker_opacity=0.7,
+                                            text=df_per_basin.apply(lambda row: f"<b>{row['basin_name']}</b><br><br>"
+                                                                                f"ID: {row['basin_id']}<br>"
+                                                                    f"Runoff (km³): {row['Runoff (km³)']} ({statistic})",
+                                                          axis=1),
+                                            hoverinfo="text"))
+
+                                    # colorscale="Viridis", zmin=0, zmax=12,
+                                    # marker_opacity=0.5, marker_line_width=0))
         fig.update_layout(
             title={
                 'text': f"<b>Runoff by Basin {start} - {end}</b>",
@@ -288,8 +260,6 @@ def update_choro(click, contents, filename, filedate, start, end, statistic):
                     size=20
                 ),
             },
-            xaxis_title="Lon",
-            yaxis_title="Lat",
             margin=go.layout.Margin(
                 l=30,  # left margin
                 r=10,  # right margin
@@ -299,8 +269,9 @@ def update_choro(click, contents, filename, filedate, start, end, statistic):
         )
         fig.update_layout(mapbox_style="mapbox://styles/jevanoff/ckckto2j900k01iomsh1f8i20",
                           mapbox_accesstoken=mapbox_token)
+        # fig.update_yaxes(sep)
 
-        return fig, None, None, 'output_tab'
+        return fig#,  'output_tab'
 
     else:
         data = []
@@ -309,7 +280,7 @@ def update_choro(click, contents, filename, filedate, start, end, statistic):
         return {
                    'data': data,
                    'layout': layout
-               }, None, None, "info_tab"
+               },   "info_tab"
 
 
 # Callback to set start year options when file is uploaded
@@ -359,13 +330,20 @@ def set_through_year_list(value, options, current_value):
 )
 def update_hydro(click_data, n_click, start, end, contents, filename, filedate):
     if contents is not None:
-        if start > end:
+        if start >= end:
             return {
                 'data': [],
-                'layout': {}
+                'layout': {
+                    'title': 'Please choose an end year that is greater than the start year'
+                }
             }
         if click_data is None:
-            location = 1
+            return {
+                'data': [],
+                'layout': {
+                    'title': 'Single Basin Data per Year (Click on a basin to load)'
+                }
+            }
         else:
             points = click_data['points']
             location = points[0]['location']

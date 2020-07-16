@@ -21,6 +21,25 @@ body{
     visibility: visible;
 }
 
+.xanthos-div
+{
+	margin: auto;
+	height: 35px;
+	line-height: 35px;
+	padding:3px;
+	vertical-align: middle;
+	width: auto;
+}
+
+.xanthos-img
+{
+  display: inline-block;
+	margin-top: auto;
+	margin-bottom: auto;
+	vertical-align: middle;
+	padding: 3px 9px 5px 1px;
+}
+
 .a-xanthos-link
 {
 	 background: rgb(2,21,70);
@@ -28,6 +47,9 @@ body{
 	display: block;
 	text-decoration: none;
 	padding-left: 10px;
+	line-height: 35px;
+	vertical-align: middle;
+	padding-top:2px;
 }
 
 .custom-tabs-container {
