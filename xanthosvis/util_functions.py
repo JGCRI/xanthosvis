@@ -5,6 +5,7 @@ import plotly.graph_objs as go
 import pandas as pd
 import plotly.express as px
 import json
+import dask.dataframe as dd
 
 
 def get_available_years(in_file, non_year_fields=['id']):
@@ -272,6 +273,7 @@ def plot_hydrograph(df, basin_id, df_ref):
     )
     fig.update_xaxes(title_text='Year')
     fig.update_yaxes(title_text='km³/yr')
+    fig.update_layout(yaxis_tickformat=',')
     # fig.show()
     return fig
 

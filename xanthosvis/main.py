@@ -8,8 +8,7 @@ import seaborn as sns
 from dash.dependencies import Input, Output, State
 import xanthosvis.util_functions as xvu
 import plotly.graph_objs as go
-import plotly.express as px
-import numpy as np
+import mapclassify as mc
 
 sns.set()
 
@@ -79,6 +78,7 @@ app.layout = html.Div(
                                         html.H6("Data Upload (File Types: .csv, zipped .csv)"),
                                         dcc.Upload(
                                             id='upload-data',
+                                            className="loader",
                                             children=html.Div([
                                                 'Drag and Drop or ',
                                                 html.A('Select Files')
@@ -103,6 +103,7 @@ app.layout = html.Div(
                                         html.H6("Choose Statistic:"),
                                         dcc.Dropdown(
                                             id='statistic',
+                                            className="loader",
                                             options=[{'label': i['label'], 'value': i['value']} for i in
                                                      acceptable_statistics],
                                             value=acceptable_statistics[0]['value'], clearable=False
@@ -115,6 +116,7 @@ app.layout = html.Div(
                                         html.H6("Choose Starting Year:"),
                                         dcc.Dropdown(
                                             id='start_year',
+                                            className="loader",
                                             options=[],
                                             clearable=False
                                         ),
@@ -126,6 +128,7 @@ app.layout = html.Div(
                                         html.H6("Choose End Year:"),
                                         dcc.Dropdown(
                                             id='through_year',
+                                            className="loader",
                                             options=[], clearable=False
                                         ),
                                     ],
@@ -139,9 +142,11 @@ app.layout = html.Div(
                                 html.Div(
                                     className="xanthos-div",
                                     children=[
-                                        html.A([html.Img(src="assets/GitHub-Mark-Light-32px.png", className="xanthos-img"),"Find Xanthos on GitHub"],
-                                               href="https://github.com/JGCRI/xanthos",
-                                               target="blank", className="a-xanthos-link")
+                                        html.A(
+                                            [html.Img(src="assets/GitHub-Mark-Light-32px.png", className="xanthos-img"),
+                                             "Find Xanthos on GitHub"],
+                                            href="https://github.com/JGCRI/xanthos",
+                                            target="blank", className="a-xanthos-link")
                                     ]
                                 ),
                             ],
@@ -153,7 +158,7 @@ app.layout = html.Div(
                     className="eight columns card-left",
                     children=[
                         dcc.Tabs(id='tabs', value="info_tab", parent_className='custom-tabs',
-                                 className='custom-tabs-container', children=[
+                                 className='custom-tabs-container loader', children=[
                                 dcc.Tab(label='Instructions', value='info_tab', className='custom-tab',
                                         selected_className='custom-tab--selected', children=[
                                         html.Div(id='tab1_content', className="bg-white",
@@ -173,6 +178,7 @@ app.layout = html.Div(
                                                 ]),
                                             ]),
                                     ]),
+
                                 dcc.Tab(label='Output', value='output_tab', className='custom-tab',
                                         selected_className='custom-tab--selected', children=[
                                         dcc.Loading(id='choro_loader', children=[
@@ -182,7 +188,7 @@ app.layout = html.Div(
                                                         'title': 'Runoff by Basin (Upload data and click "View Data")'
                                                     }
                                                 }, config={'modeBarButtonsToRemove': ['select2d', 'lasso2d']}
-                                        )]),
+                                            )]),
                                         dcc.Loading(id='hydro_loader', children=[
                                             dcc.Graph(
                                                 id='hydro_graph', figure={
@@ -190,7 +196,7 @@ app.layout = html.Div(
                                                         'title': 'Single Basin Runoff per Year (Click on a basin)'
                                                     }
                                                 }
-                                        )]),
+                                            )]),
                                     ]),
                             ]),
                     ],
@@ -202,7 +208,7 @@ app.layout = html.Div(
 
 
 # Callback to generate and load the choropleth graph when user clicks load data button
-@app.callback(Output("choro_graph", "figure"),#, Output("tabs", "value")],
+@app.callback([Output("tabs", "value"), Output("choro_graph", "figure")],
               [Input("submit_btn", 'n_clicks')],
               [State("upload-data", "contents"), State("upload-data", "filename"),
                State("upload-data", "last_modified"),
@@ -217,10 +223,10 @@ def update_choro(click, contents, filename, filedate, start, end, statistic):
                 className="alert",
                 children=["Invalid Years: Please choose a start year that is less than end year."],
             )
-            return {
-                       'data': [],
-                       'layout': {}
-                   }, error_message
+            return 'info_tab', {
+                'data': [],
+                'layout': {}
+            }, error_message
 
         year_list = xvu.get_target_years(start, end)
         data = xvu.process_file(contents, filename, filedate, years=year_list)
@@ -229,25 +235,29 @@ def update_choro(click, contents, filename, filedate, start, end, statistic):
         df = xvu.prepare_data(xanthos_data, df_ref)
         df_per_basin = xvu.data_per_basin(df, statistic, year_list, df_ref)
         df_per_basin['Runoff (km³)'] = round(df_per_basin['q'], 2)
-        # df_per_basin['plot_cut'] = pd.cut(df_per_basin['Runoff (km³)'], 6)
-        # df_per_basin['cut'] = pd.cut(df_per_basin['q'],
-        #                              bins=np.linspace(0,
-        #                                               max(df_per_basin['q'])+1, 24))
-        #                                                                           10), right=False, )
+        # df_per_basin['Runoff (km³)'].apply(lambda x : "{:,}".format(x))
+        df_per_basin['cut'] = pd.cut(df_per_basin['Runoff (km³)'], 8)
         # fig = px.choropleth_mapbox(df_per_basin, geojson=basin_features, locations='basin_id',
         #                            featureidkey='properties.basin_id', hover_name='basin_name',
         #                            color='Runoff (km³)', color_continuous_scale='Plasma', zoom=0.5, opacity=0.7,
-        #                            color)
+        #                            color) apply(mapclassify.Quantiles.make(rolling=True))
+        # df_per_basin['cut'] = pd.cut(df_per_basin['Runoff (km³)'], 8)
+        # colorscale = ['#0d0887', '#7201a8', '#bd3786', '#ed7953', '#fdca26']
+        # binlabels = np.arange(5, 105, 10) zmax=max(df_per_basin['Runoff (km³)'])*0.3, zmin=0,
+
+        # df_per_basin['cut'] = pd.cut(df_per_basin['Runoff (km³)'], bins=8)
         fig = go.Figure(go.Choroplethmapbox(geojson=basin_features, locations=df_per_basin.basin_id,
-                                            z=df_per_basin['Runoff (km³)'], marker_opacity=0.7,
-                                            text=df_per_basin.apply(lambda row: f"<b>{row['basin_name']}</b><br><br>"
-                                                                                f"ID: {row['basin_id']}<br>"
-                                                                    f"Runoff (km³): {row['Runoff (km³)']} ({statistic})",
-                                                          axis=1),
+                                            z=df_per_basin['Runoff (km³)'].astype(str), marker_opacity=0.7,
+                                            text=df_per_basin.apply(lambda row: f"<b>{row['basin_name']}</b><br>"
+                                                                                f"ID: {row['basin_id']}<br><br>"
+                                                                                f"Runoff (km³): {row['Runoff (km³)']} "
+                                                                                f"({statistic})",
+                                                                    axis=1), colorscale="Plasma",
+                                            featureidkey="properties.basin_id", legendgroup="Runoff",
                                             hoverinfo="text"))
 
-                                    # colorscale="Viridis", zmin=0, zmax=12,
-                                    # marker_opacity=0.5, marker_line_width=0))
+        # colorscale="Viridis", zmin=0, zmax=12,
+        # marker_opacity=0.5, marker_line_width=0))
         fig.update_layout(
             title={
                 'text': f"<b>Runoff by Basin {start} - {end}</b>",
@@ -269,18 +279,19 @@ def update_choro(click, contents, filename, filedate, start, end, statistic):
         )
         fig.update_layout(mapbox_style="mapbox://styles/jevanoff/ckckto2j900k01iomsh1f8i20",
                           mapbox_accesstoken=mapbox_token)
+        fig.update_layout(separators = '*.,*')
         # fig.update_yaxes(sep)
 
-        return fig#,  'output_tab'
+        return 'output_tab', fig
 
     else:
         data = []
 
         layout = {}
-        return {
-                   'data': data,
-                   'layout': layout
-               },   "info_tab"
+        return 'info_tab', {
+            'data': data,
+            'layout': layout
+        }
 
 
 # Callback to set start year options when file is uploaded
