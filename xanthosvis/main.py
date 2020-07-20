@@ -209,14 +209,13 @@ app.layout = html.Div(
 
 # Callback to generate and load the choropleth graph when user clicks load data button
 @app.callback([Output("tabs", "value"), Output("choro_graph", "figure")],
-              [Input("submit_btn", 'n_clicks')],
+              [Input("submit_btn", 'n_clicks'), Input("choro_graph", 'clickData')],
               [State("upload-data", "contents"), State("upload-data", "filename"),
                State("upload-data", "last_modified"),
                State("start_year", "value"), State("through_year", "value"),
                State("statistic", "value")],
               prevent_initial_call=True)
-def update_choro(click, contents, filename, filedate, start, end, statistic):
-    error_message = None
+def update_choro(click, graph_click, contents, filename, filedate, start, end, statistic):
     if contents:
         if start > end:
             error_message = html.Div(
@@ -236,16 +235,25 @@ def update_choro(click, contents, filename, filedate, start, end, statistic):
         df_per_basin = xvu.data_per_basin(df, statistic, year_list, df_ref)
         df_per_basin['Runoff (km³)'] = round(df_per_basin['q'], 2)
         # df_per_basin['Runoff (km³)'].apply(lambda x : "{:,}".format(x))
-        df_per_basin['cut'] = pd.cut(df_per_basin['Runoff (km³)'], 8)
-        # fig = px.choropleth_mapbox(df_per_basin, geojson=basin_features, locations='basin_id',
-        #                            featureidkey='properties.basin_id', hover_name='basin_name',
-        #                            color='Runoff (km³)', color_continuous_scale='Plasma', zoom=0.5, opacity=0.7,
-        #                            color) apply(mapclassify.Quantiles.make(rolling=True))
         # df_per_basin['cut'] = pd.cut(df_per_basin['Runoff (km³)'], 8)
-        # colorscale = ['#0d0887', '#7201a8', '#bd3786', '#ed7953', '#fdca26']
-        # binlabels = np.arange(5, 105, 10) zmax=max(df_per_basin['Runoff (km³)'])*0.3, zmin=0,
 
-        # df_per_basin['cut'] = pd.cut(df_per_basin['Runoff (km³)'], bins=8)
+        if graph_click is not None:
+            basin_id = graph_click['points'][0]['location']
+            subset = df_ref[df_ref['basin_id'] == basin_id]
+            lon_min = subset['longitude'].min()
+            lon_max = subset['longitude'].max()
+            lat_min = subset['latitude'].min()
+            lat_max = subset['latitude'].max()
+            lon = (lon_min + lon_max) / 2
+            lat = (lat_min + lat_max) / 2
+            basin_subset = list(set(df_ref[((df_ref['longitude'] >= lon_min) &
+                                            (df_ref['longitude'] <= lon_max) &
+                                            (df_ref['latitude'] >= lat_min) &
+                                            (df_ref['latitude'] <= lat_max))][
+                                        'basin_id']))
+            df_per_basin = df_per_basin[df_per_basin['basin_id'].isin(basin_subset)]
+        # df_per_basin = df_per_basin[df_per_basin['basin_id'] == basin_id]
+
         fig = go.Figure(go.Choroplethmapbox(geojson=basin_features, locations=df_per_basin.basin_id,
                                             z=df_per_basin['Runoff (km³)'].astype(str), marker_opacity=0.7,
                                             text=df_per_basin.apply(lambda row: f"<b>{row['basin_name']}</b><br>"
@@ -254,7 +262,7 @@ def update_choro(click, contents, filename, filedate, start, end, statistic):
                                                                                 f"({statistic})",
                                                                     axis=1), colorscale="Plasma",
                                             featureidkey="properties.basin_id", legendgroup="Runoff",
-                                            hoverinfo="text"))
+                                            hoverinfo="text", colorbar={'separatethousands': True, 'tickformat': ','}))
 
         # colorscale="Viridis", zmin=0, zmax=12,
         # marker_opacity=0.5, marker_line_width=0))
@@ -279,8 +287,10 @@ def update_choro(click, contents, filename, filedate, start, end, statistic):
         )
         fig.update_layout(mapbox_style="mapbox://styles/jevanoff/ckckto2j900k01iomsh1f8i20",
                           mapbox_accesstoken=mapbox_token)
-        fig.update_layout(separators = '*.,*')
-        # fig.update_yaxes(sep)
+        fig.update_layout(separators='*.,*')
+
+        if graph_click is not None:
+            fig.update_layout(mapbox={'center': {'lat': lat, 'lon': lon}, 'zoom': 2})
 
         return 'output_tab', fig
 
@@ -377,3 +387,5 @@ def update_hydro(click_data, n_click, start, end, contents, filename, filedate):
 
 if __name__ == '__main__':
     app.run_server(debug=True)
+
+choro = go.figureW
