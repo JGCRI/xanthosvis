@@ -393,5 +393,3 @@ def update_hydro(click_data, n_click, start, end, contents, filename, filedate):
 
 if __name__ == '__main__':
     app.run_server(debug=True)
-
-choro = go.figureW
