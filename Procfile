@@ -1,1 +1,1 @@
-web: gunicorn --workers 6 --threads 2 --chdir xanthosvis main:server
+web: gunicorn --workers 2 --threads 2 --chdir xanthosvis main:server
