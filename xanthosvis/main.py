@@ -238,8 +238,6 @@ def update_choro(click, graph_click, contents, filename, filedate, start, end, s
         df = xvu.prepare_data(xanthos_data, df_ref)
         df_per_basin = xvu.data_per_basin(df, statistic, year_list, df_ref)
         df_per_basin['Runoff (km³)'] = round(df_per_basin['q'], 2)
-        # df_per_basin['Runoff (km³)'].apply(lambda x : "{:,}".format(x))
-        # df_per_basin['cut'] = pd.cut(df_per_basin['Runoff (km³)'], 8)
 
         click_info = dash.callback_context.triggered[0]['prop_id']
 
@@ -268,10 +266,8 @@ def update_choro(click, graph_click, contents, filename, filedate, start, end, s
                                                                                 f"({statistic})",
                                                                     axis=1), colorscale="Plasma",
                                             featureidkey="properties.basin_id", legendgroup="Runoff",
-                                            hoverinfo="text", colorbar={'separatethousands': True, 'tickformat': ','}))
+                                            hoverinfo="text", colorbar={'separatethousands': True, 'tickformat': ","}))
 
-        # colorscale="Viridis", zmin=0, zmax=12,
-        # marker_opacity=0.5, marker_line_width=0))
         fig.update_layout(
             title={
                 'text': f"<b>Runoff by Basin {start} - {end}</b>",
@@ -290,10 +286,9 @@ def update_choro(click, graph_click, contents, filename, filedate, start, end, s
                 b=10,  # bottom margin
                 t=60  # top margin
             ),
+            mapbox_style="mapbox://styles/jevanoff/ckckto2j900k01iomsh1f8i20",
+            mapbox_accesstoken=mapbox_token, mapbox={'zoom': 0}
         )
-        fig.update_layout(mapbox_style="mapbox://styles/jevanoff/ckckto2j900k01iomsh1f8i20",
-                          mapbox_accesstoken=mapbox_token)
-        fig.update_layout(separators='*.,*')
 
         if graph_click is not None and click_info == 'choro_graph.clickData':
             fig.update_layout(mapbox={'center': {'lat': lat, 'lon': lon}, 'zoom': 2})
