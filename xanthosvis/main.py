@@ -76,25 +76,26 @@ app.layout = html.Div(
                                     className="padding-top-bot",
                                     children=[
                                         html.H6("Data Upload (File Types: .csv, zipped .csv)"),
-                                        dcc.Upload(
-                                            id='upload-data',
-                                            className="loader",
-                                            children=html.Div([
-                                                'Drag and Drop or ',
-                                                html.A('Select Files')
-                                            ]),
-                                            style={
-                                                'width': '100%',
-                                                'height': '60px',
-                                                'lineHeight': '60px',
-                                                'borderWidth': '1px',
-                                                'borderStyle': 'dashed',
-                                                'borderRadius': '5px',
-                                                'textAlign': 'center'
-                                            },
-                                            # Allow multiple files to be uploaded
-                                            multiple=True
-                                        ),
+                                        dcc.Loading(id='file_loader', children=[
+                                            dcc.Upload(
+                                                id='upload-data',
+                                                className="loader",
+                                                children=html.Div([
+                                                    'Drag and Drop or ',
+                                                    html.A('Select Files')
+                                                ]),
+                                                style={
+                                                    'width': '100%',
+                                                    'height': '60px',
+                                                    'lineHeight': '60px',
+                                                    'borderWidth': '1px',
+                                                    'borderStyle': 'dashed',
+                                                    'borderRadius': '5px',
+                                                    'textAlign': 'center'
+                                                },
+                                                # Allow multiple files to be uploaded
+                                                multiple=True
+                                            )]),
                                     ],
                                 ),
                                 html.Div(
@@ -174,7 +175,9 @@ app.layout = html.Div(
                                                         "from data upload)"),
                                                     html.Li(
                                                         "Click the 'View Data' button (also click again if there are changes "
-                                                        "to any of the fields)")
+                                                        "to any of the fields)"),
+                                                    html.Li(
+                                                        "To view an individual basin's data, click the basin on the map")
                                                 ]),
                                             ]),
                                     ]),
@@ -237,7 +240,9 @@ def update_choro(click, graph_click, contents, filename, filedate, start, end, s
         # df_per_basin['Runoff (km³)'].apply(lambda x : "{:,}".format(x))
         # df_per_basin['cut'] = pd.cut(df_per_basin['Runoff (km³)'], 8)
 
-        if graph_click is not None:
+        click_info = dash.callback_context.triggered[0]['prop_id']
+
+        if graph_click is not None and click_info == 'choro_graph.clickData':
             basin_id = graph_click['points'][0]['location']
             subset = df_ref[df_ref['basin_id'] == basin_id]
             lon_min = subset['longitude'].min()
@@ -252,7 +257,7 @@ def update_choro(click, graph_click, contents, filename, filedate, start, end, s
                                             (df_ref['latitude'] <= lat_max))][
                                         'basin_id']))
             df_per_basin = df_per_basin[df_per_basin['basin_id'].isin(basin_subset)]
-        # df_per_basin = df_per_basin[df_per_basin['basin_id'] == basin_id]
+            # df_per_basin = df_per_basin[df_per_basin['basin_id'] == basin_id]
 
         fig = go.Figure(go.Choroplethmapbox(geojson=basin_features, locations=df_per_basin.basin_id,
                                             z=df_per_basin['Runoff (km³)'].astype(str), marker_opacity=0.7,
@@ -289,7 +294,7 @@ def update_choro(click, graph_click, contents, filename, filedate, start, end, s
                           mapbox_accesstoken=mapbox_token)
         fig.update_layout(separators='*.,*')
 
-        if graph_click is not None:
+        if graph_click is not None and click_info == 'choro_graph.clickData':
             fig.update_layout(mapbox={'center': {'lat': lat, 'lon': lon}, 'zoom': 2})
 
         return 'output_tab', fig

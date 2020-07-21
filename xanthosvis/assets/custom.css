@@ -8,9 +8,10 @@ body{
   font-family: 'Roboto';
   color: #203cb3;
 }
+/*
 *[data-dash-is-loading="true"]{
 }
-/*
+
 *[data-dash-is-loading="true"].loader::before,
 *[data-dash-is-loading="true"].loader-fade::before {
     z-index: 9999;
@@ -32,7 +33,7 @@ body{
     animation: offset 1s, spinner .6s linear infinite;
 }
 
-*/
+
 
 *[data-dash-is-loading="true"]::before{
     content: "Loading...";
@@ -41,7 +42,7 @@ body{
 	font-size: 14;
 	font-weight: bold;
     visibility: visible;
-}
+}*/
 
 .xanthos-div
 {
