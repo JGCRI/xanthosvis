@@ -1,11 +1,11 @@
 import base64
 import io
+import json
 from zipfile import ZipFile
-import plotly.graph_objs as go
+
 import pandas as pd
 import plotly.express as px
-import json
-import dask.dataframe as dd
+import plotly.graph_objs as go
 
 
 def get_available_years(in_file, non_year_fields=['id']):
