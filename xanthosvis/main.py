@@ -191,7 +191,7 @@ app.layout = html.Div(
                                                     'layout': {
                                                         'title': 'Runoff by Basin (Upload data and click "View Data")'
                                                     }
-                                                }, config={'modeBarButtonsToRemove': ['select2d', 'lasso2d']}
+                                                }  # , config={'modeBarButtonsToRemove': ['select2d', 'lasso2d']}
                                             )]),
                                         dcc.Loading(id='hydro_loader', children=[
                                             dcc.Graph(
@@ -213,13 +213,14 @@ app.layout = html.Div(
 
 # Callback to generate and load the choropleth graph when user clicks load data button
 @app.callback([Output("tabs", "value"), Output("choro_graph", "figure")],
-              [Input("submit_btn", 'n_clicks'), Input("choro_graph", 'clickData')],
+              [Input("submit_btn", 'n_clicks'), Input("choro_graph", 'clickData'),
+               Input("choro_graph", "selectedData")],
               [State("upload-data", "contents"), State("upload-data", "filename"),
                State("upload-data", "last_modified"),
                State("start_year", "value"), State("through_year", "value"),
                State("statistic", "value")],
               prevent_initial_call=True)
-def update_choro(click, graph_click, contents, filename, filedate, start, end, statistic):
+def update_choro(click, graph_click, selected_data, contents, filename, filedate, start, end, statistic):
     if contents:
         if start > end:
             error_message = html.Div(
@@ -242,7 +243,7 @@ def update_choro(click, graph_click, contents, filename, filedate, start, end, s
         click_info = dash.callback_context.triggered[0]['prop_id']
 
         if graph_click is not None and click_info == 'choro_graph.clickData':
-            basin_id = graph_click['points'][0]['location']
+            basin_id = graph_click['points'][0]['customdata']
             subset = df_ref[df_ref['basin_id'] == basin_id]
             lon_min = subset['longitude'].min()
             lon_max = subset['longitude'].max()
@@ -258,6 +259,58 @@ def update_choro(click, graph_click, contents, filename, filedate, start, end, s
             df_per_basin = df_per_basin[df_per_basin['basin_id'].isin(basin_subset)]
             # df_per_basin = df_per_basin[df_per_basin['basin_id'] == basin_id]
 
+        elif selected_data is not None and click_info == 'choro_graph.selectedData':
+            # basin_id = selected_data['points'][0]['location']
+            basin_id = [i['location'] for i in selected_data['points']]
+            df = df[df['basin_id'].isin(basin_id)]
+            df_selected = xvu.data_per_cell(df, statistic, year_list, df_ref)
+            df_selected['Runoff (km³)'] = round(df_selected['q'], 2)
+            lon_min = df_selected['longitude'].min()
+            lon_max = df_selected['longitude'].max()
+            lat_min = df_selected['latitude'].min()
+            lat_max = df_selected['latitude'].max()
+            lon = (lon_min + lon_max) / 2
+            lat = (lat_min + lat_max) / 2
+            # df_per_basin = xvu.data_per_cell(df, statistic, year_list, df_ref_sub)
+            fig = go.Figure(go.Scattermapbox(lat=df_selected['latitude'], lon=df_selected['longitude'],
+                                             mode='markers', customdata=df['basin_id'],
+                                             text=df_selected.apply(lambda row: f"<b>{row['basin_name']}</b><br>"
+                                                                                f"ID: {row['basin_id']}<br>"
+                                                                                f"Grid Cell: {row['id']}<br><br>"
+                                                                                f"Runoff (km³): {row['Runoff (km³)']} "
+                                                                                f"({statistic})",
+                                                                    axis=1), hoverinfo="text",
+                                             marker=go.scattermapbox.Marker(
+                                                 size=8,
+                                                 color=df_selected['Runoff (km³)'],
+                                                 opacity=0.4,
+                                                 showscale=True
+                                             )
+                                             ))
+            fig.update_layout(
+                title={
+                    'text': f"<b>Runoff ({statistic}) by Basin {start} - {end}</b>",
+                    'y': 0.94,
+                    'x': 0.5,
+                    'xanchor': 'center',
+                    'yanchor': 'top',
+                    'font': dict(
+                        family='Roboto',
+                        size=20
+                    ),
+                },
+                margin=go.layout.Margin(
+                    l=30,  # left margin
+                    r=10,  # right margin
+                    b=10,  # bottom margin
+                    t=60  # top margin
+                ),
+                mapbox_style="mapbox://styles/jevanoff/ckckto2j900k01iomsh1f8i20",
+                mapbox_accesstoken=mapbox_token, mapbox={'center': {'lat': lat, 'lon': lon}, 'zoom': 2}
+            )
+
+            return 'output_tab', fig
+
         fig = go.Figure(go.Choroplethmapbox(geojson=basin_features, locations=df_per_basin.basin_id,
                                             z=df_per_basin['Runoff (km³)'].astype(str), marker_opacity=0.7,
                                             text=df_per_basin.apply(lambda row: f"<b>{row['basin_name']}</b><br>"
@@ -266,11 +319,12 @@ def update_choro(click, graph_click, contents, filename, filedate, start, end, s
                                                                                 f"({statistic})",
                                                                     axis=1), colorscale="Plasma",
                                             featureidkey="properties.basin_id", legendgroup="Runoff",
-                                            hoverinfo="text", colorbar={'separatethousands': True, 'tickformat': ","}))
+                                            hoverinfo="text", colorbar={'separatethousands': True, 'tickformat': ","},
+                                            customdata=df_per_basin['basin_id']))
 
         fig.update_layout(
             title={
-                'text': f"<b>Runoff by Basin {start} - {end}</b>",
+                'text': f"<b>Runoff ({statistic}) by Basin {start} - {end}</b>",
                 'y': 0.94,
                 'x': 0.5,
                 'xanchor': 'center',
@@ -368,7 +422,7 @@ def update_hydro(click_data, n_click, start, end, contents, filename, filedate):
             }
         else:
             points = click_data['points']
-            location = points[0]['location']
+            location = points[0]['customdata']
 
         years = xvu.get_target_years(start, end)
         max_basin_row = xvu.hydro_basin_lookup(location, df_ref)

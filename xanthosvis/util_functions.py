@@ -139,6 +139,58 @@ def data_per_basin(df, statistic, yr_list, df_ref):
 
     return grp
 
+def data_per_cell(df, statistic, yr_list, df_ref):
+    """Generate a data frame representing data per basin for all years
+    represented by an input statistic.
+
+    :param df:                      Data with basin id
+    :type df:                       dataframe
+
+    :param statistic:               statistic name from user input
+    :type statistic:                str
+
+    :param yr_list:                 List of years to process
+    :type yr_list:                  list
+
+    :return:                        dataframe; grouped by basin for statistic
+
+    """
+    column_list = list(df)
+    column_list.remove('id')
+    column_list.remove('basin_id')
+    # sum data by basin by year
+    df_ref = df_ref.set_index('grid_id')
+    df = df.join(df_ref, 'id', 'left', 'a1')
+    #grp = df[column_list].sum(axis=1)
+
+    # calculate stat
+    if statistic == 'mean':
+        df['q'] = df[yr_list].mean(axis=1)
+
+    elif statistic == 'median':
+        df['q'] = df[yr_list].median(axis=1)
+
+    elif statistic == 'min':
+        df['q'] = df[yr_list].min(axis=1)
+
+    elif statistic == 'max':
+        df['q'] = df[yr_list].max(axis=1)
+
+    elif statistic == 'standard deviation':
+        df['q'] = df[yr_list].std(axis=1)
+
+    else:
+        msg = f"The statistic requested '{statistic}' is not a valid option."
+        raise ValueError(msg)
+
+    # grp.drop(columns=yr_list, inplace=True)
+
+    # grp.reset_index(inplace=True)
+    # mapping = dict(df_ref[['basin_id', 'basin_name']].values)
+    # grp['basin_name'] = grp.basin_id.map(mapping)
+
+    return df
+
 
 def data_per_year_basin(df, basin_id, yr_list):
     """Generate a data frame representing the sum of the data per year for a target basin.
