@@ -39,12 +39,13 @@ def available_through_years(available_year_list, start_year):
     :return:                               list of available through years
 
     """
+
+    # Construct options for drop down based on input parameters
     options = []
     for i in available_year_list:
         if int(i['value']) >= int(start_year):
             options.append(i)
     return options
-    # return [i for i in available_year_list if i >= start_year]
 
 
 def basin_to_gridcell_dict(df_reference):
@@ -67,7 +68,7 @@ def basin_to_gridcell_dict(df_reference):
 
 
 def prepare_data(df, df_ref):
-    """Read in data from input file and add the basin id from a reference file.
+    """Process datafram to add the basin id from reference file.
 
     :param df:                      Processed dataframe
     :type df:                       dataframe
@@ -85,7 +86,6 @@ def prepare_data(df, df_ref):
     # add basin id
     df['basin_id'] = df['id'].map(grid_basin_dict)
 
-
     return df
 
 
@@ -101,6 +101,9 @@ def data_per_basin(df, statistic, yr_list, df_ref):
 
     :param yr_list:                 List of years to process
     :type yr_list:                  list
+
+    :param df_ref                   Reference dataframe
+    :type df_ref                    dataframe
 
     :return:                        dataframe; grouped by basin for statistic
 
@@ -131,13 +134,16 @@ def data_per_basin(df, statistic, yr_list, df_ref):
         msg = f"The statistic requested '{statistic}' is not a valid option."
         raise ValueError(msg)
 
+    #  Drop unneeded columns
     grp.drop(columns=yr_list, inplace=True)
 
+    # Map basin values using df_ref
     grp.reset_index(inplace=True)
     mapping = dict(df_ref[['basin_id', 'basin_name']].values)
     grp['basin_name'] = grp.basin_id.map(mapping)
 
     return grp
+
 
 def data_per_cell(df, statistic, yr_list, df_ref):
     """Generate a data frame representing data per basin for all years
@@ -152,18 +158,23 @@ def data_per_cell(df, statistic, yr_list, df_ref):
     :param yr_list:                 List of years to process
     :type yr_list:                  list
 
+    :param df_ref                   Reference dataframe
+    :type df_ref                    dataframe
+
     :return:                        dataframe; grouped by basin for statistic
 
     """
+
+    # Set up column list for joins
     column_list = list(df)
     column_list.remove('id')
     column_list.remove('basin_id')
-    # sum data by basin by year
+
+    # Sum data by basin by year
     df_ref = df_ref.set_index('grid_id')
     df = df.join(df_ref, 'id', 'left', 'a1')
-    #grp = df[column_list].sum(axis=1)
 
-    # calculate stat
+    # Calculate stat
     if statistic == 'mean':
         df['q'] = df[yr_list].mean(axis=1)
 
@@ -208,24 +219,23 @@ def data_per_year_basin(df, basin_id, yr_list):
 
     """
 
-    # sum data by basin by year
+    # Sum data by basin by year
     grp = df.groupby('basin_id').sum()
 
     keep_cols = yr_list
 
+    # Adjust columns and reset index
     grp.drop(columns=['id'], inplace=True)
     grp = grp[keep_cols]
     grp.reset_index(inplace=True)
 
-    # get only target basin_id
+    # Get only target basin_id
     dfx = grp.loc[grp['basin_id'] == basin_id].copy()
 
+    # Adjust return DF columns and reset index
     dfx.drop(columns=['basin_id'], inplace=True)
-
     df = dfx.T.copy()
-
     df.reset_index(inplace=True)
-
     df.columns = ['Year', 'q']
 
     return df
@@ -240,6 +250,7 @@ def process_geojson(in_file):
     :return:                        geojson array
 
     """
+
     with open(in_file) as get:
         basin_features = json.load(get)
 
@@ -249,38 +260,60 @@ def process_geojson(in_file):
     return basin_features
 
 
-def plot_choropleth(df_per_basin, basin_features, start, end):
+def plot_choropleth(df_per_basin, basin_features, mapbox_token, statistic, start, end):
     """Plot interactive choropleth map for basin level statistics.
 
-    :param df:                      dataframe with basin level stats
-    :type df:                       dataframe
+    :param df_per_basin:            dataframe with basin level stats
+    :type df_per_basin:             dataframe
 
-    :param geojson_basin:           geojson spatial data and basin id field
-    :type geojson_basin:
+    :param basin_features:          geojson spatial data and basin id field
+    :type basin_features:           dataframe
+
+    :param start                    beginning year
+    :type start                     number
+
+    :param end                      ending year
+    :type end                       number
 
     """
-    fig = px.choropleth_mapbox(df_per_basin, geojson=basin_features, locations='basin_id',
-                               featureidkey='properties.basin_id',
-                               color='q', color_continuous_scale="Viridis", zoom=1, opacity=0.7)
+
+    fig = go.Figure(go.Choroplethmapbox(geojson=basin_features, locations=df_per_basin.basin_id,
+                                        z=df_per_basin['Runoff (km³)'].astype(str), marker_opacity=0.7,
+                                        text=df_per_basin.apply(lambda row: f"<b>{row['basin_name']}</b><br>"
+                                                                            f"ID: {row['basin_id']}<br><br>"
+                                                                            f"Runoff (km³): {row['Runoff (km³)']} "
+                                                                            f"({statistic})",
+                                                                axis=1), colorscale="Plasma",
+                                        featureidkey="properties.basin_id", legendgroup="Runoff",
+                                        hoverinfo="text",
+                                        colorbar={'separatethousands': True, 'tickformat': ",",
+                                                  'title': 'Runoff (km³)',
+                                                  'tickvals': [0, 500, 1000, 1500, 2000, 4000]},
+                                        customdata=df_per_basin['basin_id']))
+
     fig.update_layout(
         title={
-            'text': f"Runoff by Basin {start} - {end}",
-            'y': 0.95,
+            'text': f"<b>Runoff ({statistic}) by Basin {start} - {end}</b>",
+            'y': 0.94,
             'x': 0.5,
             'xanchor': 'center',
-            'yanchor': 'top'},
-        xaxis_title="Lon",
-        yaxis_title="Lat",
+            'yanchor': 'top',
+            'font': dict(
+                family='Roboto',
+                size=20
+            ),
+        },
+        margin=go.layout.Margin(
+            l=30,  # left margin
+            r=10,  # right margin
+            b=10,  # bottom margin
+            t=60  # top margin
+        ),
+        mapbox_style="mapbox://styles/jevanoff/ckckto2j900k01iomsh1f8i20",
+        mapbox_accesstoken=mapbox_token, mapbox={'zoom': 0}
     )
-    fig.update_layout(mapbox_style="carto-positron", mapbox_layers=[
-        {
-            "below": 'traces',
-            "sourcetype": "raster",
-            "source": [
-                "https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}"
-            ]
-        }
-    ])
+
+    return fig
 
     return fig
 
@@ -294,13 +327,19 @@ def plot_hydrograph(df, basin_id, df_ref):
     :param basin_id:             basin id
     :type basin_id:              int
 
+    :param df_ref:              Reference dataframe with gis data
+    :type df_ref                dataframe
+
     """
 
+    # Process dataframe and set up variables
     df['q'] = round(df['q'], 2)
     df['Runoff'] = df['q']
     df_basin = df_ref[df_ref['basin_id'] == basin_id][0:1]
     df_basin = df_basin['basin_name']
     basin_name = df_basin.iat[0]
+
+    # Construct figure object
     fig = px.line(df, x='Year', y='Runoff', title=f"Basin {basin_id} Runoff per Year")
     fig.update_xaxes(nticks=len(df))
     fig.update_layout(
@@ -326,15 +365,48 @@ def plot_hydrograph(df, basin_id, df_ref):
     fig.update_xaxes(title_text='Year')
     fig.update_yaxes(title_text='km³/yr')
     fig.update_layout(yaxis_tickformat=',')
-    # fig.show()
     return fig
 
 
 def get_target_years(start, end):
+    """Return a string based list of the year range
+
+       :param start:            Start Year
+       :type start:             int
+
+       :param end:              End year
+       :type end:               int
+
+       :return:                 list of years
+
+    """
+
     return [str(i) for i in range(int(start), int(end) + 1)]
 
 
 def process_file(contents, filename, filedate, years, row_count="max"):
+    """Return processed and decoded object for the uploaded file and the calculated units
+
+    :param contents:             Raw contents of uploaded file
+    :type contents:              str
+
+    :param filename:             Name of uplaoded file
+    :type filename:              str
+
+    :param filedate:             Date of uploaded file
+    :type filedate:              str
+
+    :param years:                List of years to process
+    :type years:                 array
+
+    :param row_count:            Row number to read from to reduce number of rows read in certain situations
+    :type row_count:             int
+
+    :return:                     Processed contents object and calculated unit type
+
+    """
+
+    # Pre-processing of years, columns, units, set up variables
     if years != 0:
         read_cols = years + ['id']
     else:
@@ -348,6 +420,8 @@ def process_file(contents, filename, filedate, years, row_count="max"):
         unit_display = "km^3/yr"
     if units == 'km3peryear':
         unit_display = 'Km^3/yr'
+
+    # Try catch to process file based on type
     try:
         if 'zip' in filename[0]:
             for content, name, date in zip(contents, filename, filedate):
@@ -357,9 +431,10 @@ def process_file(contents, filename, filedate, years, row_count="max"):
                 content_decoded = base64.b64decode(content_string)
                 # Use BytesIO to handle the decoded content
                 zip_str = io.BytesIO(content_decoded)
-                # Now you can use ZipFile to take the BytesIO output
+                # Use ZipFile to take the BytesIO output
                 zip_file = ZipFile(zip_str, 'r')
                 filename = zip_file.namelist()[0]
+            # Read file based on input parameters for number of rows/columns to help performance
             with zip_file.open(filename) as csvfile:
                 if row_count == "max":
                     if read_cols == "all":
@@ -372,25 +447,11 @@ def process_file(contents, filename, filedate, years, row_count="max"):
                     else:
                         xanthos_data = pd.read_csv(csvfile, encoding='utf8', sep=",", usecols=read_cols,
                                                    nrows=row_count)
-
-        elif 'xls' in filename[0]:
-            # Assume that the user uploaded an excel file
-            content_type, content_string = contents[0].split(',')
-            decoded = base64.b64decode(content_string)
-            if row_count == "max":
-                if read_cols == "all":
-                    xanthos_data = pd.read_excel(io.BytesIO(decoded))
-                else:
-                    xanthos_data = pd.read_excel(io.BytesIO(decoded), usecols=read_cols)
-            else:
-                if read_cols == "all":
-                    xanthos_data = pd.read_excel(io.BytesIO(decoded), nrows=row_count)
-                else:
-                    xanthos_data = pd.read_excel(io.BytesIO(decoded), nrows=row_count, usecols=read_cols)
         elif 'csv' in filename[0]:
-            # Assume that the user uploaded a CSV file
+            # Assume that the user uploaded a CSV file and decode
             content_type, content_string = contents[0].split(',')
             decoded = base64.b64decode(content_string)
+            # Read file based on input parameters for number of rows/columns to help performance
             if row_count == "max":
                 if read_cols == "all":
                     xanthos_data = pd.read_csv(io.StringIO(decoded.decode('utf-8')), error_bad_lines=False,
@@ -405,24 +466,6 @@ def process_file(contents, filename, filedate, years, row_count="max"):
                 else:
                     xanthos_data = pd.read_csv(io.StringIO(decoded.decode('utf-8')), nrows=row_count, usecols=read_cols,
                                                error_bad_lines=False, warn_bad_lines=True)
-        elif 'txt' in filename[0]:
-            # Assume that the user uploaded a CSV file
-            content_string = contents[0].split("\t")
-            decoded = base64.b64decode(content_string[0])
-            if row_count == "max":
-                if read_cols == "all":
-                    xanthos_data = pd.read_csv(io.StringIO(decoded.decode('cp1252')), error_bad_lines=False,
-                                               warn_bad_lines=True)
-                else:
-                    xanthos_data = pd.read_csv(io.StringIO(decoded.decode('cp1252')), usecols=read_cols,
-                                               error_bad_lines=False, warn_bad_lines=True)
-            else:
-                if read_cols == "all":
-                    xanthos_data = pd.read_csv(io.StringIO(decoded.decode('cp1252')), nrows=row_count,
-                                               error_bad_lines=False, warn_bad_lines=True)
-                else:
-                    xanthos_data = pd.read_csv(io.StringIO(decoded.decode('cp1252')), nrows=row_count,
-                                               usecols=read_cols, error_bad_lines=False, warn_bad_lines=True)
     except Exception as e:
         print(e)
         return None
@@ -430,13 +473,206 @@ def process_file(contents, filename, filedate, years, row_count="max"):
 
 
 def process_input_years(contents, filename, filedate):
+    """Process input file to get list of available years from it
+
+    :param contents:             Raw contents of uploaded file
+    :type contents:              str
+
+    :param filename:             Name of uplaoded file
+    :type filename:              str
+
+    :param filedate:             Date of uploaded file
+    :type filedate:              str
+
+    :return:                     Processed list of years available in file data
+
+    """
+
     file_data = process_file(contents, filename, filedate, years=0, row_count=0)[0]
     target_years = get_available_years(file_data)
     return target_years
 
 
 def hydro_basin_lookup(basin_id, df_ref):
+    """Get max row of a particular basin's grid cells to reduce row count for performance
+
+    :param basin_id:             ID of basin to find it's grid cells
+    :type basin_id:              int
+
+    :param df_ref:               Reference dataframe
+    :type df_ref:                dataframe
+
+    :return:                     Max row of basin in file data
+
+    """
+
     # get which grid cells are associated with the target basin
-    # target_idx_list = [k for k in df_ref.keys() if df_ref[:k] == basin_id]
     target_idx_list = df_ref[df_ref['basin_id'] == basin_id]
     return max(target_idx_list['grid_id'])
+
+
+def update_choro_click(df_ref, df_per_basin, basin_features, mapbox_token, graph_click, start, end, statistic):
+    """Return a choropleth figured object based off user click event
+
+    :param df_ref:                   Reference dataframe
+    :type df_ref:                    dataframe
+
+    :param df_per_basin:             Processed data dataframe
+    :type df_per_basin:              dataframe
+
+    :param basin_features:           Basin features reference
+    :type basin_features:            dataframe
+
+    :param mapbox_token:             Mapbox access token
+    :type mapbox_token:              string
+
+    :param graph_click:              Click event data for the choropleth graph
+    :type graph_click:               object
+
+    :param start:                    Start year
+    :type start:                     int
+
+    :param end:                      End year
+    :type end:                       int
+
+    :param statistic:                Statistic to be computed
+    :type statistic:                 str
+
+    :return:                         Choropleth figure object
+
+    """
+
+    basin_id = graph_click['points'][0]['customdata']
+    subset = df_ref[df_ref['basin_id'] == basin_id]
+    lon_min = subset['longitude'].min()
+    lon_max = subset['longitude'].max()
+    lat_min = subset['latitude'].min()
+    lat_max = subset['latitude'].max()
+    lon = (lon_min + lon_max) / 2
+    lat = (lat_min + lat_max) / 2
+    basin_subset = list(set(df_ref[((df_ref['longitude'] >= lon_min) &
+                                    (df_ref['longitude'] <= lon_max) &
+                                    (df_ref['latitude'] >= lat_min) &
+                                    (df_ref['latitude'] <= lat_max))][
+                                'basin_id']))
+    df_per_basin = df_per_basin[df_per_basin['basin_id'].isin(basin_subset)]
+    fig = go.Figure(go.Choroplethmapbox(geojson=basin_features, locations=df_per_basin.basin_id,
+                                        z=df_per_basin['Runoff (km³)'].astype(str), marker_opacity=0.7,
+                                        text=df_per_basin.apply(lambda row: f"<b>{row['basin_name']}</b><br>"
+                                                                            f"ID: {row['basin_id']}<br><br>"
+                                                                            f"Runoff (km³): {row['Runoff (km³)']} "
+                                                                            f"({statistic})",
+                                                                axis=1), colorscale="Plasma",
+                                        featureidkey="properties.basin_id", legendgroup="Runoff",
+                                        hoverinfo="text",
+                                        colorbar={'separatethousands': True, 'tickformat': ",",
+                                                  'title': 'Runoff (km³)',
+                                                  'tickvals': [0, 500, 1000, 1500, 2000, 4000]},
+                                        customdata=df_per_basin['basin_id']))
+
+    fig.update_layout(
+        title={
+            'text': f"<b>Runoff ({statistic}) by Basin {start} - {end}</b>",
+            'y': 0.94,
+            'x': 0.5,
+            'xanchor': 'center',
+            'yanchor': 'top',
+            'font': dict(
+                family='Roboto',
+                size=20
+            ),
+        },
+        margin=go.layout.Margin(
+            l=30,  # left margin
+            r=10,  # right margin
+            b=10,  # bottom margin
+            t=60  # top margin
+        ),
+        mapbox_style="mapbox://styles/jevanoff/ckckto2j900k01iomsh1f8i20",
+        mapbox_accesstoken=mapbox_token, mapbox={'center': {'lat': lat, 'lon': lon}, 'zoom': 3}
+    )
+
+    return fig
+
+
+def update_choro_select(df_ref, df, year_list, mapbox_token, selected_data, start, end, statistic):
+    """Return a choropleth figured object based off user area select event
+
+    :param df_ref:                  Reference dataframe
+    :type df_ref:                   dataframe
+
+    :param df:                      Processed data dataframe
+    :type df:                       dataframe
+
+    :param year_list:               List of years to process
+    :type year_list:                array
+
+    :param mapbox_token:            Mapbox access token
+    :type mapbox_token:             string
+
+    :param selected_data:           Select event data for the choropleth graph
+    :type selected_data:            object
+
+    :param start:                   Start year
+    :type start:                    int
+
+    :param end:                     End year
+    :type end:                      int
+
+    :param statistic:               Statistic to be computed
+    :type statistic:                str
+
+    :return:                        Choropleth figure object
+
+    """
+    basin_id = [i['customdata'] for i in selected_data['points']]
+    df = df[df['basin_id'].isin(basin_id)]
+    df_selected = data_per_cell(df, statistic, year_list, df_ref)
+    df_selected['Runoff (km³)'] = round(df_selected['q'], 2)
+    lon_min = df_selected['longitude'].min()
+    lon_max = df_selected['longitude'].max()
+    lat_min = df_selected['latitude'].min()
+    lat_max = df_selected['latitude'].max()
+    lon = (lon_min + lon_max) / 2
+    lat = (lat_min + lat_max) / 2
+    # df_per_basin = xvu.data_per_cell(df, statistic, year_list, df_ref_sub)
+
+    fig = go.Figure(go.Scattermapbox(lat=df_selected['latitude'], lon=df_selected['longitude'],
+                                     mode='markers', customdata=df['basin_id'],
+                                     text=df_selected.apply(lambda row: f"<b>{row['basin_name']}</b><br>"
+                                                                        f"ID: {row['basin_id']}<br>"
+                                                                        f"Grid Cell: {row['id']}<br><br>"
+                                                                        f"Runoff (km³): {row['Runoff (km³)']} "
+                                                                        f"({statistic})",
+                                                            axis=1), hoverinfo="text",
+                                     # colorbar={'title': 'Runoff (km³)'},
+                                     marker=go.scattermapbox.Marker(
+                                         size=8,
+                                         color=df_selected['Runoff (km³)'],
+                                         opacity=0.4,
+                                         showscale=True
+                                     )
+                                     ))
+    fig.update_layout(
+        title={
+            'text': f"<b>Runoff ({statistic}) by Basin {start} - {end}</b>",
+            'y': 0.94,
+            'x': 0.5,
+            'xanchor': 'center',
+            'yanchor': 'top',
+            'font': dict(
+                family='Roboto',
+                size=20
+            ),
+        },
+        margin=go.layout.Margin(
+            l=30,  # left margin
+            r=10,  # right margin
+            b=10,  # bottom margin
+            t=60  # top margin
+        ),
+        mapbox_style="mapbox://styles/jevanoff/ckckto2j900k01iomsh1f8i20",
+        mapbox_accesstoken=mapbox_token, mapbox={'center': {'lat': lat, 'lon': lon}, 'zoom': 3}
+    )
+
+    return fig
