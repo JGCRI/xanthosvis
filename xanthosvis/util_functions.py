@@ -8,7 +8,7 @@ import plotly.express as px
 import plotly.graph_objs as go
 
 
-def get_available_years(in_file, non_year_fields=['id']):
+def get_available_years(in_file, non_year_fields=None):
     """Get available years from file.  Reads only the header from the file.
 
     :params in_file:               Processed file as a dataframe
@@ -22,6 +22,8 @@ def get_available_years(in_file, non_year_fields=['id']):
     """
 
     # drop non-year fields
+    if non_year_fields is None:
+        non_year_fields = ['id']
     in_file.drop(columns=non_year_fields, inplace=True)
 
     return [{'label': i, 'value': i} for i in in_file.columns]
@@ -68,7 +70,7 @@ def basin_to_gridcell_dict(df_reference):
 
 
 def prepare_data(df, df_ref):
-    """Process datafram to add the basin id from reference file.
+    """Process dataframe to add the basin id from reference file.
 
     :param df:                      Processed dataframe
     :type df:                       dataframe
@@ -269,6 +271,12 @@ def plot_choropleth(df_per_basin, basin_features, mapbox_token, statistic, start
     :param basin_features:          geojson spatial data and basin id field
     :type basin_features:           dataframe
 
+    :param mapbox_token             Access token for mapbox
+    :type mapbox_token              str
+
+    :param statistic                Chosen statistic to run on data
+    :type statistic                 str
+
     :param start                    beginning year
     :type start                     number
 
@@ -278,7 +286,7 @@ def plot_choropleth(df_per_basin, basin_features, mapbox_token, statistic, start
     """
 
     fig = go.Figure(go.Choroplethmapbox(geojson=basin_features, locations=df_per_basin.basin_id,
-                                        z=df_per_basin['Runoff (km³)'].astype(str), marker_opacity=0.7,
+                                        z=df_per_basin['Runoff (km³)'].astype(str), marker=dict(opacity=0.7),
                                         text=df_per_basin.apply(lambda row: f"<b>{row['basin_name']}</b><br>"
                                                                             f"ID: {row['basin_id']}<br><br>"
                                                                             f"Runoff (km³): {row['Runoff (km³)']} "
@@ -312,8 +320,6 @@ def plot_choropleth(df_per_basin, basin_features, mapbox_token, statistic, start
         mapbox_style="mapbox://styles/jevanoff/ckckto2j900k01iomsh1f8i20",
         mapbox_accesstoken=mapbox_token, mapbox={'zoom': 0}
     )
-
-    return fig
 
     return fig
 
@@ -390,14 +396,14 @@ def process_file(contents, filename, filedate, years, row_count="max"):
     :param contents:             Raw contents of uploaded file
     :type contents:              str
 
-    :param filename:             Name of uplaoded file
+    :param filename:             Name of uploaded file
     :type filename:              str
 
     :param filedate:             Date of uploaded file
     :type filedate:              str
 
     :param years:                List of years to process
-    :type years:                 array
+    :type years:                 list
 
     :param row_count:            Row number to read from to reduce number of rows read in certain situations
     :type row_count:             int
@@ -407,19 +413,21 @@ def process_file(contents, filename, filedate, years, row_count="max"):
     """
 
     # Pre-processing of years, columns, units, set up variables
-    if years != 0:
+    if years:
         read_cols = years + ['id']
     else:
         read_cols = "all"
     f = filename[0]
     split = f.split('_')
     units = ""
+    unit_display = ""
     if len(split) > 1:
         units = split[1]
     else:
         unit_display = "km^3/yr"
     if units == 'km3peryear':
         unit_display = 'Km^3/yr'
+    zip_file = None
 
     # Try catch to process file based on type
     try:
@@ -478,7 +486,7 @@ def process_input_years(contents, filename, filedate):
     :param contents:             Raw contents of uploaded file
     :type contents:              str
 
-    :param filename:             Name of uplaoded file
+    :param filename:             Name of uploaded file
     :type filename:              str
 
     :param filedate:             Date of uploaded file
@@ -488,7 +496,7 @@ def process_input_years(contents, filename, filedate):
 
     """
 
-    file_data = process_file(contents, filename, filedate, years=0, row_count=0)[0]
+    file_data = process_file(contents, filename, filedate, years=[], row_count=0)[0]
     target_years = get_available_years(file_data)
     return target_years
 
@@ -527,7 +535,7 @@ def update_choro_click(df_ref, df_per_basin, basin_features, mapbox_token, graph
     :type mapbox_token:              string
 
     :param graph_click:              Click event data for the choropleth graph
-    :type graph_click:               object
+    :type graph_click:               dict
 
     :param start:                    Start year
     :type start:                     int
@@ -557,7 +565,7 @@ def update_choro_click(df_ref, df_per_basin, basin_features, mapbox_token, graph
                                 'basin_id']))
     df_per_basin = df_per_basin[df_per_basin['basin_id'].isin(basin_subset)]
     fig = go.Figure(go.Choroplethmapbox(geojson=basin_features, locations=df_per_basin.basin_id,
-                                        z=df_per_basin['Runoff (km³)'].astype(str), marker_opacity=0.7,
+                                        z=df_per_basin['Runoff (km³)'].astype(str), marker=dict(opacity=0.7),
                                         text=df_per_basin.apply(lambda row: f"<b>{row['basin_name']}</b><br>"
                                                                             f"ID: {row['basin_id']}<br><br>"
                                                                             f"Runoff (km³): {row['Runoff (km³)']} "
@@ -605,13 +613,13 @@ def update_choro_select(df_ref, df, year_list, mapbox_token, selected_data, star
     :type df:                       dataframe
 
     :param year_list:               List of years to process
-    :type year_list:                array
+    :type year_list:                list
 
     :param mapbox_token:            Mapbox access token
     :type mapbox_token:             string
 
     :param selected_data:           Select event data for the choropleth graph
-    :type selected_data:            object
+    :type selected_data:            dict
 
     :param start:                   Start year
     :type start:                    int

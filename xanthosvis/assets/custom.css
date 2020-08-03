@@ -109,7 +109,7 @@ body{
     border-top: 3px solid #33C3F0 !important;
 }
 
-.study-browser-banner {
+.banner {
   background: rgb(2,21,70);
   color: white;
   padding: 12px;
@@ -236,7 +236,7 @@ h5{
     height: auto;
   }
   
-  .study-browser-banner{
+  .banner{
     padding-left: 24px;
   }
 
