@@ -262,7 +262,7 @@ def process_geojson(in_file):
     return basin_features
 
 
-def plot_choropleth(df_per_basin, basin_features, mapbox_token, statistic, start, end):
+def plot_choropleth(df_per_basin, basin_features, mapbox_token, statistic, start, end, units):
     """Plot interactive choropleth map for basin level statistics.
 
     :param df_per_basin:            dataframe with basin level stats
@@ -603,7 +603,7 @@ def update_choro_click(df_ref, df_per_basin, basin_features, mapbox_token, graph
     return fig
 
 
-def update_choro_select(df_ref, df, year_list, mapbox_token, selected_data, start, end, statistic):
+def update_choro_select(df_ref, df, year_list, mapbox_token, selected_data, start, end, statistic, units):
     """Return a choropleth figured object based off user area select event
 
     :param df_ref:                  Reference dataframe

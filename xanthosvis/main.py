@@ -326,13 +326,14 @@ def update_choro(load_click, filter_click, graph_click, selected_data, contents,
         # Generate figure based on type of click data (click, area select, or initial load)
         if graph_click is not None and click_info == 'choro_graph.clickData':
             fig = xvu.update_choro_click(df_ref, df_per_basin, basin_features, mapbox_token, graph_click, start, end,
-                                         statistic)
+                                         statistic, units)
 
         elif selected_data is not None and click_info == 'choro_graph.selectedData':
-            fig = xvu.update_choro_select(df_ref, df, year_list, mapbox_token, selected_data, start, end, statistic)
+            fig = xvu.update_choro_select(df_ref, df, year_list, mapbox_token, selected_data, start, end, statistic,
+                                          units)
 
         else:
-            fig = xvu.plot_choropleth(df_per_basin, basin_features, mapbox_token, statistic, start, end)
+            fig = xvu.plot_choropleth(df_per_basin, basin_features, mapbox_token, statistic, start, end, units)
 
         return 'output_tab', fig
 
