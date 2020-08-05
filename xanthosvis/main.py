@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import math
 import os
 
 import dash
@@ -9,6 +10,7 @@ import pandas as pd
 import seaborn as sns
 from dash.dependencies import Input, Output, State
 from flask_caching import Cache
+from dash.exceptions import PreventUpdate
 
 import xanthosvis.util_functions as xvu
 
@@ -24,6 +26,13 @@ cache = Cache(app.server, config={
 TIMEOUT = 600
 server = app.server
 root_dir = 'include/'
+config = {'displaylogo': False, 'toImageButtonOptions': {
+    'format': 'svg',  # one of png, svg, jpeg, webp
+    'filename': 'custom_image',
+    'height': None,
+    'width': None,
+    'scale': 1  # Multiply title/legend/axis/canvas sizes by this factor
+}}
 
 # Access Token for Mapbox
 mapbox_token = open("include/mapbox-token").read()
@@ -63,6 +72,7 @@ acceptable_statistics = [{'label': 'Mean', 'value': 'mean'}, {'label': 'Median',
 
 app.layout = html.Div(
     children=[
+        dcc.Store(id="select_store"),
         html.Div(id="error-message"),
         html.Div(
             className="banner row",
@@ -159,8 +169,18 @@ app.layout = html.Div(
                                 html.Div(
                                     className="padding-top-bot",
                                     children=[
+
+                                        daq.BooleanSwitch(id="grid_toggle", on=False,
+                                                          style={'display': 'inline-block'}),
+                                        html.Label(" View as Gridded Data", className="grid-label"),
+
+                                    ],
+                                ),
+                                html.Div(
+                                    className="padding-top-bot",
+                                    children=[
                                         html.Button('Load Data', id='submit_btn', n_clicks=0),
-                                        html.Button('Filter Data', id='filter_btn', n_clicks=0),
+                                        html.Button('Reset Graph', id='reset_btn', n_clicks=0),
 
                                     ],
                                 ),
@@ -184,61 +204,65 @@ app.layout = html.Div(
                     children=[
                         dcc.Tabs(id='tabs', value="info_tab", parent_className='custom-tabs',
                                  className='custom-tabs-container loader', children=[
-                            dcc.Tab(label='Instructions', value='info_tab', className='custom-tab',
-                                    selected_className='custom-tab--selected', children=[
-                                html.Div(id='tab1_content', className="bg-white",
-                                                style={'height': '100%', 'min-height': '490px', 'padding-top':
-                                                    '20px', 'padding-left': '15px'}, children=[
-                                    html.H6("How to Use the System:"),
-                                    html.Ol(children=[
-                                        html.Li("Use the 'Data Upload' component to upload Xanthos output "
-                                                "data"),
-                                        html.Li("Choose the statistic you would like to view"),
-                                        html.Li(
-                                            "Choose the year range from the available start/end years ("
-                                            "calculated from data upload)"),
-                                        html.Li(
-                                            "Click the 'Load Data' button (clicking again will reload the "
-                                            "file and reset the view/filters)"),
-                                    ]),
-                                html.H6("Filtering Data:"),
-                                html.Li(
-                                    "Once data is loaded, to view a subset of basin's either click "
-                                    "on a basin, or use the select/lasso tool to view "
-                                    "a custom group of basins"),
-                                html.Li(
-                                    "To filter without resetting, change the parameters and click the "
-                                    "'Filter Data' button")
+                                dcc.Tab(label='Instructions', value='info_tab', className='custom-tab',
+                                        selected_className='custom-tab--selected', children=[
+                                        html.Div(id='tab1_content', className="bg-white",
+                                                 style={'height': '100%', 'min-height': '490px', 'padding-top':
+                                                     '20px', 'padding-left': '15px'}, children=[
+                                                html.H6("Loading Data:"),
+                                                html.Ol(children=[
+                                                    html.Li("Use the 'Data Upload' component to upload Xanthos output "
+                                                            "data"),
+                                                    html.Li("Choose the statistic you would like to view"),
+                                                    html.Li(
+                                                        "Choose the year range from the available start/end years ("
+                                                        "calculated from data upload)"),
+                                                    html.Li(
+                                                        "Click the 'Load Data' button (click again after making "
+                                                        "any changes to input fields)"),
+                                                ]),
+                                                html.H6("Filtering Data:"),
+                                                html.Ul(children=[
+                                                    html.Li(
+                                                        "Once data is loaded, to view a subset of basins "
+                                                        "use the box select or lasso tool to "
+                                                        "select group of basins and rescale the graph"),
+                                                    html.Li(
+                                                        "To view downscaled 0.5 degree resolution cell data, click "
+                                                        "the 'View as Gridded Data' box (note: best used on a subset "
+                                                        "of data due to processing time constraints)"),
+                                                    html.Li(
+                                                        "To reset the graph back to it's initial state, click the "
+                                                        "'Reset Graph' button")
 
+                                                ]),
+                                            ]),
+                                    ]),
+
+                                dcc.Tab(label='Output', value='output_tab', className='custom-tab',
+                                        selected_className='custom-tab--selected', children=[
+                                        html.Div(
+                                            children=[
+                                            ]),
+                                        dcc.Loading(id='choro_loader', children=[
+                                            dcc.Graph(
+                                                id='choro_graph', figure={
+                                                    'layout': {
+                                                        'title': 'Runoff by Basin (Upload data and click "Load Data")'
+                                                    }
+                                                }, config=config
+                                            )]),
+                                        dcc.Loading(id='hydro_loader', children=[
+                                            dcc.Graph(
+                                                id='hydro_graph', figure={
+                                                    'layout': {
+                                                        'title': 'Single Basin Runoff per Year (Click on a basin)'
+                                                    }
+                                                }, config=config
+                                            )]
+                                                    ),
                                     ]),
                             ]),
-
-                            dcc.Tab(label='Output', value='output_tab', className='custom-tab',
-                                    selected_className='custom-tab--selected', children=[
-                                html.Div(children=[daq.ToggleSwitch(label="View as Gridded Data", labelPosition="right")
-                                                   ]),
-                                dcc.Loading(id='choro_loader', children=[
-                                    # dcc.Checklist(id='view_gridded', options=[
-                                    #     {'label': 'View Gridded Data', 'value': '1'}
-                                    # ]),
-                                    dcc.Graph(
-                                        id='choro_graph', figure={
-                                            'layout': {
-                                                'title': 'Runoff by Basin (Upload data and click "View Data")'
-                                            }
-                                        }  # , config={'modeBarButtonsToRemove': ['select2d', 'lasso2d']}
-                                    )]),
-                                dcc.Loading(id='hydro_loader', children=[
-                                    dcc.Graph(
-                                        id='hydro_graph', figure={
-                                            'layout': {
-                                                'title': 'Single Basin Runoff per Year (Click on a basin)'
-                                            }
-                                        }
-                                    )]
-                                ),
-                            ]),
-                        ]),
                     ],
                 ),
             ],
@@ -251,30 +275,31 @@ app.layout = html.Div(
 
 # ----- Dash Callbacks
 
-# Callback to generate and load the choropleth graph when user clicks load data button
-@app.callback([Output("tabs", "value"), Output("choro_graph", "figure")],
-              [Input("submit_btn", 'n_clicks'), Input("filter_btn", 'n_clicks'), Input("choro_graph", 'clickData'),
-               Input("choro_graph", "selectedData")],
-              [State("upload-data", "contents"), State("upload-data", "filename"),
+# Callback to generate and load the choropleth graph when user clicks load data button or toggle grid view
+@app.callback([Output("tabs", "value"), Output("grid_toggle", "on"), Output("choro_graph", "figure")],
+              [Input("submit_btn", 'n_clicks'), Input("reset_btn", 'n_clicks'),  # Input("choro_graph", 'clickData'),
+               Input("choro_graph", "selectedData"), Input("choro_graph", "relayoutData")],
+              [State("grid_toggle", "on"), State("upload-data", "contents"), State("upload-data", "filename"),
                State("upload-data", "last_modified"),
                State("start_year", "value"), State("through_year", "value"),
                State("statistic", "value"), State("choro_graph", "figure")],
               prevent_initial_call=True)
-def update_choro(load_click, filter_click, graph_click, selected_data, contents, filename, filedate, start, end,
+def update_choro(load_click, reset_click, selected_data, zoom_data, toggle_value, contents, filename, filedate, start,
+                 end,
                  statistic, fig_info):
     """Generate choropleth figure based on input values and type of click event
 
        :param load_click:               Click event data for load button
        :type load_click:                int
 
-       :param filter_click:             Click event data for filter button
-       :type filter_click:              int
-
-       :param graph_click:              Click event data for the choropleth graph
-       :type graph_click:               dict
+       :param reset_click:             Click event data for reset button
+       :type reset_click:              int
 
        :param selected_data             Area select event data for the choropleth graph
        :type selected_data              dict
+
+       :param toggle_value              Value of grid toggle switch
+       :type toggle_value               int
 
        :param contents:                 Contents of uploaded file
        :type contents:                  str
@@ -300,7 +325,7 @@ def update_choro(load_click, filter_click, graph_click, selected_data, contents,
        :return:                         Choropleth figure
 
        """
-
+    # Don't process anything unless there's contents in the file upload component
     if contents:
         # Check for valid inputs
         if start > end:
@@ -308,11 +333,19 @@ def update_choro(load_click, filter_click, graph_click, selected_data, contents,
                 className="alert",
                 children=["Invalid Years: Please choose a start year that is less than end year."],
             )
-            return 'info_tab', {
+            return 'info_tab', toggle_value, {
                 'data': [],
                 'layout': {}
-            }, error_message
+            }
 
+        click_value = dash.callback_context.triggered[0]['value']
+        click_info = dash.callback_context.triggered[0]['prop_id']
+        if click_info == 'choro_graph.relayoutData':
+            if type(click_value).__name__ == 'dict' and 'mapbox.zoom' in click_value.keys() and toggle_value is True:
+                fig_info['data'][0]['marker']['size'] = math.ceil(click_value['mapbox.zoom'] * 5)
+                return 'output_tab', toggle_value, fig_info
+            elif click_value != {'autosize': True}:
+                raise PreventUpdate
         # Process inputs (years, data) and set up variables
         year_list = xvu.get_target_years(start, end)
         data = xvu.process_file(contents, filename, filedate, years=year_list)
@@ -321,34 +354,64 @@ def update_choro(load_click, filter_click, graph_click, selected_data, contents,
         df = xvu.prepare_data(xanthos_data, df_ref)
         df_per_basin = xvu.data_per_basin(df, statistic, year_list, df_ref)
         df_per_basin['Runoff (km³)'] = round(df_per_basin['q'], 2)
-        click_info = dash.callback_context.triggered[0]['prop_id']
+
+        if click_info == 'reset_btn.n_clicks':
+            fig = xvu.plot_choropleth(df_per_basin, basin_features, mapbox_token, statistic, start, end, units)
+            return 'output_tab', False, fig
 
         # Generate figure based on type of click data (click, area select, or initial load)
-        if graph_click is not None and click_info == 'choro_graph.clickData':
-            fig = xvu.update_choro_click(df_ref, df_per_basin, basin_features, mapbox_token, graph_click, start, end,
-                                         statistic, units)
+        # if graph_click is not None and click_info == 'choro_graph.clickData':
+        #     fig = xvu.update_choro_click(df_ref, df_per_basin, basin_features, mapbox_token, graph_click, start, end,
+        #                                  statistic, units)
 
-        elif selected_data is not None and click_info == 'choro_graph.selectedData':
-            fig = xvu.update_choro_select(df_ref, df, year_list, mapbox_token, selected_data, start, end, statistic,
-                                          units)
+        if selected_data is not None and click_info == 'choro_graph.selectedData':
+            if len(selected_data['points']) == 0:
+                fig = xvu.plot_choropleth(df_per_basin, basin_features, mapbox_token, statistic, start, end, units)
+            else:
+                if toggle_value is True:
+                    fig = xvu.update_choro_grid(df_ref, df, basin_features, year_list, mapbox_token, selected_data,
+                                                start, end, statistic, units)
+                else:
+                    fig = xvu.update_choro_select(df_ref, df_per_basin, basin_features, year_list, mapbox_token,
+                                                  selected_data, start, end, statistic, units)
 
+        elif click_info == "grid_toggle.on":
+            if toggle_value is True:
+                fig = xvu.update_choro_grid(df_ref, df, basin_features, year_list, mapbox_token, selected_data,
+                                            start, end, statistic, units)
+            else:
+                fig = xvu.update_choro_select(df_ref, df_per_basin, basin_features, year_list, mapbox_token,
+                                              selected_data, start, end, statistic, units)
         else:
-            fig = xvu.plot_choropleth(df_per_basin, basin_features, mapbox_token, statistic, start, end, units)
+            if selected_data is not None and len(selected_data['points']) != 0:
+                if toggle_value is True:
+                    fig = xvu.update_choro_grid(df_ref, df, basin_features, year_list, mapbox_token, selected_data,
+                                                start, end, statistic, units)
+                else:
+                    fig = xvu.update_choro_select(df_ref, df_per_basin, basin_features, year_list, mapbox_token,
+                                                  selected_data, start, end, statistic, units)
+            else:
+                if toggle_value is True:
+                    fig = xvu.update_choro_grid(df_ref, df, basin_features, year_list, mapbox_token, selected_data,
+                                                start, end, statistic, units)
+                else:
+                    fig = xvu.plot_choropleth(df_per_basin, basin_features, mapbox_token, statistic, start, end, units)
 
-        return 'output_tab', fig
+        return 'output_tab', toggle_value, fig
 
     # If no contents, just return the blank map with instruction
     else:
         data = []
 
         layout = {'title': 'Runoff by Basin (Upload data and click "View Data'}
-        return 'info_tab', {
-            'data': data,
-            'layout': layout
-        }
+        return 'info_tab', toggle_value, {
+                   'data': data,
+                   'layout': layout
+               }
+
+    # Callback to set start year options when file is uploaded and store data in upload component contents
 
 
-# Callback to set start year options when file is uploaded and store data in upload component contents
 @app.callback(
     [Output("start_year", "options"), Output("start_year", "value"), Output("upload-data", "children")],
     [Input("upload-data", "contents")], [State('upload-data', 'filename'), State('upload-data', 'last_modified')],
@@ -491,4 +554,4 @@ def update_hydro(click_data, n_click, start, end, contents, filename, filedate):
 
 # Start Dash Server
 if __name__ == '__main__':
-    app.run_server(debug=True)
+    app.run_server(debug=True, threaded=True)

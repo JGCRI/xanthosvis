@@ -283,6 +283,9 @@ def plot_choropleth(df_per_basin, basin_features, mapbox_token, statistic, start
     :param end                      ending year
     :type end                       number
 
+    :param units:               Unit of measurement
+    :type units:                str
+
     """
 
     fig = go.Figure(go.Choroplethmapbox(geojson=basin_features, locations=df_per_basin.basin_id,
@@ -519,7 +522,7 @@ def hydro_basin_lookup(basin_id, df_ref):
     return max(target_idx_list['grid_id'])
 
 
-def update_choro_click(df_ref, df_per_basin, basin_features, mapbox_token, graph_click, start, end, statistic):
+def update_choro_click(df_ref, df_per_basin, basin_features, mapbox_token, graph_click, start, end, statistic, units):
     """Return a choropleth figured object based off user click event
 
     :param df_ref:                   Reference dataframe
@@ -545,6 +548,9 @@ def update_choro_click(df_ref, df_per_basin, basin_features, mapbox_token, graph
 
     :param statistic:                Statistic to be computed
     :type statistic:                 str
+
+    :param units:               Unit of measurement
+    :type units:                str
 
     :return:                         Choropleth figure object
 
@@ -603,14 +609,18 @@ def update_choro_click(df_ref, df_per_basin, basin_features, mapbox_token, graph
     return fig
 
 
-def update_choro_select(df_ref, df, year_list, mapbox_token, selected_data, start, end, statistic, units):
+def update_choro_select(df_ref, df_per_basin, basin_features, year_list, mapbox_token, selected_data, start, end,
+                        statistic, units):
     """Return a choropleth figured object based off user area select event
 
     :param df_ref:                  Reference dataframe
     :type df_ref:                   dataframe
 
-    :param df:                      Processed data dataframe
-    :type df:                       dataframe
+    :param df_per_basin:                      Processed data dataframe
+    :type df_per_basin:                       dataframe
+
+    :param basin_features:                      Reference dataframe
+    :type basin_features:                       dataframe
 
     :param year_list:               List of years to process
     :type year_list:                list
@@ -630,11 +640,135 @@ def update_choro_select(df_ref, df, year_list, mapbox_token, selected_data, star
     :param statistic:               Statistic to be computed
     :type statistic:                str
 
+    :param units:               Unit of measurement
+    :type units:                str
+
     :return:                        Choropleth figure object
 
     """
     basin_id = [i['customdata'] for i in selected_data['points']]
-    df = df[df['basin_id'].isin(basin_id)]
+    df_per_basin = df_per_basin[df_per_basin['basin_id'].isin(basin_id)]
+    subset = df_ref[df_ref['basin_id'].isin(basin_id)]
+    lon_min = subset['longitude'].min()
+    lon_max = subset['longitude'].max()
+    lat_min = subset['latitude'].min()
+    lat_max = subset['latitude'].max()
+    lon = (lon_min + lon_max) / 2
+    lat = (lat_min + lat_max) / 2
+    fig = go.Figure(go.Choroplethmapbox(geojson=basin_features, locations=df_per_basin.basin_id,
+                                        z=df_per_basin['Runoff (km³)'].astype(str), marker=dict(opacity=0.7),
+                                        text=df_per_basin.apply(lambda row: f"<b>{row['basin_name']}</b><br>"
+                                                                            f"ID: {row['basin_id']}<br><br>"
+                                                                            f"Runoff (km³): {row['Runoff (km³)']} "
+                                                                            f"({statistic})",
+                                                                axis=1), colorscale="Plasma",
+                                        featureidkey="properties.basin_id", legendgroup="Runoff",
+                                        hoverinfo="text",
+                                        colorbar={'separatethousands': True, 'tickformat': ",",
+                                                  'title': 'Runoff (km³)'},
+                                        customdata=df_per_basin['basin_id']))
+
+    fig.update_layout(
+        title={
+            'text': f"<b>Runoff ({statistic}) by Basin {start} - {end}</b>",
+            'y': 0.94,
+            'x': 0.5,
+            'xanchor': 'center',
+            'yanchor': 'top',
+            'font': dict(
+                family='Roboto',
+                size=20
+            ),
+        },
+        margin=go.layout.Margin(
+            l=30,  # left margin
+            r=10,  # right margin
+            b=10,  # bottom margin
+            t=60  # top margin
+        ),
+        mapbox_style="mapbox://styles/jevanoff/ckckto2j900k01iomsh1f8i20",
+        mapbox_accesstoken=mapbox_token, mapbox={'center': {'lat': lat, 'lon': lon}, 'zoom': 3}
+    )
+    # fig = go.Figure(go.Scattermapbox(lat=df_selected['latitude'], lon=df_selected['longitude'],
+    #                                  mode='markers', customdata=df['basin_id'],
+    #                                  text=df_selected.apply(lambda row: f"<b>{row['basin_name']}</b><br>"
+    #                                                                     f"ID: {row['basin_id']}<br>"
+    #                                                                     f"Grid Cell: {row['id']}<br><br>"
+    #                                                                     f"Runoff (km³): {row['Runoff (km³)']} "
+    #                                                                     f"({statistic})",
+    #                                                         axis=1), hoverinfo="text",
+    #                                  # colorbar={'title': 'Runoff (km³)'},
+    #                                  marker=go.scattermapbox.Marker(
+    #                                      size=8,
+    #                                      color=df_selected['Runoff (km³)'],
+    #                                      opacity=0.4,
+    #                                      showscale=True
+    #                                  )
+    #                                  ))
+    # fig.update_layout(
+    #     title={
+    #         'text': f"<b>Runoff ({statistic}) by Basin {start} - {end}</b>",
+    #         'y': 0.94,
+    #         'x': 0.5,
+    #         'xanchor': 'center',
+    #         'yanchor': 'top',
+    #         'font': dict(
+    #             family='Roboto',
+    #             size=20
+    #         ),
+    #     },
+    #     margin=go.layout.Margin(
+    #         l=30,  # left margin
+    #         r=10,  # right margin
+    #         b=10,  # bottom margin
+    #         t=60  # top margin
+    #     ),
+    #     mapbox_style="mapbox://styles/jevanoff/ckckto2j900k01iomsh1f8i20",
+    #     mapbox_accesstoken=mapbox_token, mapbox={'center': {'lat': lat, 'lon': lon}, 'zoom': 3}
+    # )
+
+    return fig
+
+
+def update_choro_grid(df_ref, df, basin_features, year_list, mapbox_token, selected_data, start, end, statistic, units):
+    """Return a choropleth figured object based off user area select event
+
+    :param df_ref:                  Reference dataframe
+    :type df_ref:                   dataframe
+
+    :param df:                      Processed data dataframe
+    :type df:                       dataframe
+
+    :param basin_features:                      Reference dataframe
+    :type basin_features:                       dataframe
+
+    :param year_list:               List of years to process
+    :type year_list:                list
+
+    :param mapbox_token:            Mapbox access token
+    :type mapbox_token:             string
+
+    :param selected_data:           Select event data for the choropleth graph
+    :type selected_data:            dict
+
+    :param start:                   Start year
+    :type start:                    int
+
+    :param end:                     End year
+    :type end:                      int
+
+    :param statistic:               Statistic to be computed
+    :type statistic:                str
+
+    :param units:               Unit of measurement
+    :type units:                str
+
+    :return:                        Choropleth figure object
+
+    """
+    if selected_data is not None:
+        basin_id = [i['customdata'] for i in selected_data['points']]
+        df = df[df['basin_id'].isin(basin_id)]
     df_selected = data_per_cell(df, statistic, year_list, df_ref)
     df_selected['Runoff (km³)'] = round(df_selected['q'], 2)
     lon_min = df_selected['longitude'].min()
@@ -644,6 +778,9 @@ def update_choro_select(df_ref, df, year_list, mapbox_token, selected_data, star
     lon = (lon_min + lon_max) / 2
     lat = (lat_min + lat_max) / 2
     # df_per_basin = xvu.data_per_cell(df, statistic, year_list, df_ref_sub)
+
+    # fig = go.Figure(go.Densitymapbox(lat=df_selected['latitude'], lon=df_selected['longitude'],
+    #                                  z=df_selected['Runoff (km³)'], radius=10))
 
     fig = go.Figure(go.Scattermapbox(lat=df_selected['latitude'], lon=df_selected['longitude'],
                                      mode='markers', customdata=df['basin_id'],
@@ -655,7 +792,7 @@ def update_choro_select(df_ref, df, year_list, mapbox_token, selected_data, star
                                                             axis=1), hoverinfo="text",
                                      # colorbar={'title': 'Runoff (km³)'},
                                      marker=go.scattermapbox.Marker(
-                                         size=8,
+                                         size=14,
                                          color=df_selected['Runoff (km³)'],
                                          opacity=0.4,
                                          showscale=True

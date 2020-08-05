@@ -44,6 +44,12 @@ body{
     visibility: visible;
 }*/
 
+.grid-label
+{
+    display:inline;
+    vertical-align: text-bottom;
+}
+
 .xanthos-div
 {
 	margin: auto;
@@ -166,11 +172,11 @@ h5{
 }
 
 .app-body{
-  margin-left: 3%;
+  margin-left: 2.5%;
 }
 
 .card{
-  padding:32px 20px 32px 20px;
+  padding:25px 20px 25px 20px;
   margin-left: 4%;
 	border-radius: 15px;
 }
