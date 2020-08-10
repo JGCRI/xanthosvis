@@ -244,7 +244,7 @@ app.layout = html.Div(
                                         html.Div(
                                             children=[
                                             ]),
-                                        dcc.Loading(id='choro_loader', children=[
+                                        dcc.Loading(id='choro_loader',  children=[
                                             dcc.Graph(
                                                 id='choro_graph', figure={
                                                     'layout': {
@@ -339,10 +339,11 @@ def update_choro(load_click, reset_click, selected_data, zoom_data, toggle_value
             }
 
         click_value = dash.callback_context.triggered[0]['value']
-        click_info = dash.callback_context.triggered[0]['prop_id']
+        click_info = dash.callback_context. triggered[0]['prop_id']
         if click_info == 'choro_graph.relayoutData':
             if type(click_value).__name__ == 'dict' and 'mapbox.zoom' in click_value.keys() and toggle_value is True:
-                fig_info['data'][0]['marker']['size'] = math.ceil(click_value['mapbox.zoom'] * 5)
+                fig_info['data'][0]['marker']['size'] = click_value['mapbox.zoom'] * 5
+                #fig_info['data'][0]['radius'] = math.ceil(click_value['mapbox.zoom'] * 3 + 1)
                 return 'output_tab', toggle_value, fig_info
             elif click_value != {'autosize': True}:
                 raise PreventUpdate
