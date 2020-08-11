@@ -531,7 +531,10 @@ def update_hydro(click_data, n_click, start, end, contents, filename, filedate):
         # Get data from user click
         else:
             points = click_data['points']
-            location = points[0]['customdata']
+            if points[0]['customdata'].__class__ == int:
+                location = points[0]['customdata']
+            else:
+                location = points[0]['customdata'][0]
 
         # Process years, basin information
         years = xvu.get_target_years(start, end)

@@ -6,6 +6,7 @@ from zipfile import ZipFile
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objs as go
+import numpy as np
 
 
 def get_available_years(in_file, non_year_fields=None):
@@ -298,8 +299,7 @@ def plot_choropleth(df_per_basin, basin_features, mapbox_token, statistic, start
                                         featureidkey="properties.basin_id", legendgroup="Runoff",
                                         hoverinfo="text",
                                         colorbar={'separatethousands': True, 'tickformat': ",",
-                                                  'title': 'Runoff (km³)',
-                                                  'tickvals': [0, 500, 1000, 1500, 2000, 4000]},
+                                                  'title': 'Runoff (km³)'},
                                         customdata=df_per_basin['basin_id']))
 
     fig.update_layout(
@@ -556,7 +556,7 @@ def update_choro_click(df_ref, df_per_basin, basin_features, mapbox_token, graph
 
     """
 
-    basin_id = graph_click['points'][0]['customdata']
+    basin_id = graph_click['points'][0]['customdata'][0]
     subset = df_ref[df_ref['basin_id'] == basin_id]
     lon_min = subset['longitude'].min()
     lon_max = subset['longitude'].max()
@@ -582,7 +582,7 @@ def update_choro_click(df_ref, df_per_basin, basin_features, mapbox_token, graph
                                         colorbar={'separatethousands': True, 'tickformat': ",",
                                                   'title': 'Runoff (km³)',
                                                   'tickvals': [0, 500, 1000, 1500, 2000, 4000]},
-                                        customdata=df_per_basin['basin_id']))
+                                        customdata=[df_per_basin['basin_id'], df_per_basin['id']]))
 
     fig.update_layout(
         title={
@@ -646,7 +646,10 @@ def update_choro_select(df_ref, df_per_basin, basin_features, year_list, mapbox_
     :return:                        Choropleth figure object
 
     """
-    basin_id = [i['customdata'] for i in selected_data['points']]
+    if selected_data['points'][0]['customdata'].__class__ == int:
+        basin_id = [i['customdata'] for i in selected_data['points']]
+    else:
+        basin_id = [i['customdata'][0] for i in selected_data['points']]
     df_per_basin = df_per_basin[df_per_basin['basin_id'].isin(basin_id)]
     subset = df_ref[df_ref['basin_id'].isin(basin_id)]
     lon_min = subset['longitude'].min()
@@ -655,6 +658,7 @@ def update_choro_select(df_ref, df_per_basin, basin_features, year_list, mapbox_
     lat_max = subset['latitude'].max()
     lon = (lon_min + lon_max) / 2
     lat = (lat_min + lat_max) / 2
+    #custom_data = [[x, y] for x, y in zip(df_per_basin['basin_id'], df_per_basin['id'])]
     fig = go.Figure(go.Choroplethmapbox(geojson=basin_features, locations=df_per_basin.basin_id,
                                         z=df_per_basin['Runoff (km³)'].astype(str), marker=dict(opacity=0.7),
                                         text=df_per_basin.apply(lambda row: f"<b>{row['basin_name']}</b><br>"
@@ -766,10 +770,37 @@ def update_choro_grid(df_ref, df, basin_features, year_list, mapbox_token, selec
     :return:                        Choropleth figure object
 
     """
-    if selected_data is not None:
-        basin_id = [i['customdata'] for i in selected_data['points']]
-        df = df[df['basin_id'].isin(basin_id)]
-    df_selected = data_per_cell(df, statistic, year_list, df_ref)
+    if selected_data is None:
+        df_selected = data_per_cell(df, statistic, year_list, df_ref)
+
+    else:
+        if 'range' in selected_data.keys():
+            if selected_data['points'][0]['customdata'].__class__ == int:
+                basin_id = [i['customdata'] for i in selected_data['points']]
+            else:
+                basin_id = [i['customdata'][0] for i in selected_data['points']]
+            df = df[df['basin_id'].isin(basin_id)]
+            df_selected = data_per_cell(df, statistic, year_list, df_ref)
+            range = selected_data['range']['mapbox']
+            min_lon = min((range[0][0], range[1][0]))
+            max_lon = max((range[0][0], range[1][0]))
+            min_lat = min((range[0][1], range[1][1]))
+            max_lat = max((range[0][1], range[1][1]))
+        else:
+            range = selected_data['lassoPoints']['mapbox']
+            min_lon = min(x[0] for x in range)
+            max_lon = max(x[0] for x in range)
+            min_lat = min(x[1] for x in range)
+            max_lat = max(x[1] for x in range)
+            if selected_data['points'][0]['customdata'].__class__ == int:
+                basin_id = [i['customdata'] for i in selected_data['points']]
+                df = df[df['basin_id'].isin(basin_id)]
+                df_selected = data_per_cell(df, statistic, year_list, df_ref)
+            else:
+                df_selected = data_per_cell(df, statistic, year_list, df_ref)
+                selected_points = [i['customdata'][1] for i in selected_data['points']]
+                df_selected = df_selected[df_selected['id'].isin(selected_points)]
+
     df_selected['Runoff (km³)'] = round(df_selected['q'], 2)
     lon_min = df_selected['longitude'].min()
     lon_max = df_selected['longitude'].max()
@@ -781,21 +812,39 @@ def update_choro_grid(df_ref, df, basin_features, year_list, mapbox_token, selec
 
     # fig = go.Figure(go.Densitymapbox(lat=df_selected['latitude'], lon=df_selected['longitude'],
     #                                  z=df_selected['Runoff (km³)'], radius=10))
-
+    # fig = go.Figure()
+    # fig.add_trace(go.Scattermapbox(lat=df_selected['latitude'], lon=df_selected['longitude'],
+    #                                mode='markers', customdata=np.dstack((df_selected['basin_id'], df_selected['id'])),
+    #                                text=df_selected.apply(lambda row: f"<b>{row['basin_name']}</b><br>"
+    #                                                                   f"ID: {row['basin_id']}<br>"
+    #                                                                   f"Grid Cell: {row['id']}<br><br>"
+    #                                                                   f"Runoff (km³): {row['Runoff (km³)']} "
+    #                                                                   f"({statistic})",
+    #                                                       axis=1), hoverinfo="text",
+    #                                # colorbar={'title': 'Runoff (km³)'},
+    #                                marker=go.scattermapbox.Marker(
+    #                                    size=14,
+    #                                    color=df_selected['Runoff (km³)'],
+    #                                    opacity=0.4,
+    #                                    showscale=True
+    #                                )
+    #                                ))
+    custom_data = [[x, y] for x, y in zip(df_selected['basin_id'], df_selected['id'])]
     fig = go.Figure(go.Scattermapbox(lat=df_selected['latitude'], lon=df_selected['longitude'],
-                                     mode='markers', customdata=df['basin_id'],
+                                     mode='markers', customdata=custom_data,
                                      text=df_selected.apply(lambda row: f"<b>{row['basin_name']}</b><br>"
                                                                         f"ID: {row['basin_id']}<br>"
                                                                         f"Grid Cell: {row['id']}<br><br>"
                                                                         f"Runoff (km³): {row['Runoff (km³)']} "
                                                                         f"({statistic})",
                                                             axis=1), hoverinfo="text",
-                                     # colorbar={'title': 'Runoff (km³)'},
+
                                      marker=go.scattermapbox.Marker(
                                          size=14,
                                          color=df_selected['Runoff (km³)'],
                                          opacity=0.4,
-                                         showscale=True
+                                         showscale=True,
+                                         colorbar={'title': 'Runoff (km³)'}
                                      )
                                      ))
     fig.update_layout(
