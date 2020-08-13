@@ -17,7 +17,7 @@ import xanthosvis.util_functions as xvu
 # ----- Define init options and system configuration
 
 # Dash init, define parameters and css information
-app = dash.Dash(__name__, external_stylesheets=['assets/base.css', 'assets/custom.css'],
+app = dash.Dash(__name__, external_stylesheets=['assets/base.css', 'assets/custom.css'], show_undo_redo=True,
                 meta_tags=[{"name": "viewport", "content": "width=device-width"}], suppress_callback_exceptions=True)
 cache = Cache(app.server, config={
     'CACHE_TYPE': 'filesystem',
@@ -342,7 +342,7 @@ def update_choro(load_click, reset_click, selected_data, zoom_data, toggle_value
         click_info = dash.callback_context. triggered[0]['prop_id']
         if click_info == 'choro_graph.relayoutData':
             if type(click_value).__name__ == 'dict' and 'mapbox.zoom' in click_value.keys() and toggle_value is True:
-                fig_info['data'][0]['marker']['size'] = click_value['mapbox.zoom'] * 5
+                fig_info['data'][0]['marker']['size'] = click_value['mapbox.zoom'] * 4.5
                 #fig_info['data'][0]['radius'] = math.ceil(click_value['mapbox.zoom'] * 3 + 1)
                 return 'output_tab', toggle_value, fig_info
             elif click_value != {'autosize': True}:
@@ -533,16 +533,25 @@ def update_hydro(click_data, n_click, start, end, contents, filename, filedate):
             points = click_data['points']
             if points[0]['customdata'].__class__ == int:
                 location = points[0]['customdata']
+                location_type = 'basin'
             else:
-                location = points[0]['customdata'][0]
+                location = points[0]['customdata'][1]
+                location_type = 'cell'
 
-        # Process years, basin information
+        # Process years, basin/cell information
         years = xvu.get_target_years(start, end)
-        max_basin_row = xvu.hydro_basin_lookup(location, df_ref)
-        file_data = xvu.process_file(contents, filename, filedate, years, max_basin_row)[0]
-        processed_data = xvu.prepare_data(file_data, df_ref)
-        hydro_data = xvu.data_per_year_basin(processed_data, location, years)
-        return xvu.plot_hydrograph(hydro_data, location, df_ref)
+        if location_type == 'basin':
+            max_basin_row = xvu.hydro_basin_lookup(location, df_ref)
+            file_data = xvu.process_file(contents, filename, filedate, years, max_basin_row)[0]
+            processed_data = xvu.prepare_data(file_data, df_ref)
+            hydro_data = xvu.data_per_year_basin(processed_data, location, years)
+            return xvu.plot_hydrograph(hydro_data, location, df_ref, 'basin')
+        elif location_type == 'cell':
+            max_cell_row = xvu.hydro_cell_lookup(location, df_ref)
+            file_data = xvu.process_file(contents, filename, filedate, years, max_cell_row)[0]
+            processed_data = xvu.prepare_data(file_data, df_ref)
+            hydro_data = xvu.data_per_year_cell(processed_data, location, years)
+            return xvu.plot_hydrograph(hydro_data, location, df_ref, 'cell')
     # Return nothing if there's no uploaded contents
     else:
         data = []

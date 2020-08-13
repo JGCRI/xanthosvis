@@ -244,6 +244,49 @@ def data_per_year_basin(df, basin_id, yr_list):
     return df
 
 
+def data_per_year_cell(df, cell_id, yr_list):
+    """Generate a data frame representing the sum of the data per year for a target basin.
+
+    :param df:                      input data having data per year
+    :type df:                       dataframe
+
+    :param cell_id:                id of basin to filter and aggregate data for
+    :type cell_id:                 int
+
+    :param yr_list                  list of years to consider
+    :type yr_list                   list
+
+    :return:                        dataframe; sum values per year for a target basin
+
+    """
+
+    # Sum data by basin by year
+    # grp = df.groupby('basin_id').sum()
+
+    keep_cols = yr_list
+
+    # Adjust columns and reset index
+    #grp.drop(columns=['id'], inplace=True)
+    #grp = grp[keep_cols]
+    #grp.reset_index(inplace=True)
+
+    # Get only target basin_id
+    # dfx = grp.loc[grp['basin_id'] == cell_id].copy()
+
+    # Adjust return DF columns and reset index
+    # dfx.drop(columns=['basin_id'], inplace=True)
+    # df = dfx.T.copy()
+    # df.reset_index(inplace=True)
+    df = df[df['id'] == cell_id]
+    df.drop(columns=['basin_id', 'id'], inplace=True)
+    df = df[keep_cols]
+    df = df.T
+    df.reset_index(inplace=True)
+    df.columns = ['Year', 'q']
+
+    return df
+
+
 def process_geojson(in_file):
     """Read in geojson spatial data and add in a feature level id.
 
@@ -327,33 +370,33 @@ def plot_choropleth(df_per_basin, basin_features, mapbox_token, statistic, start
     return fig
 
 
-def plot_hydrograph(df, basin_id, df_ref):
+def plot_hydrograph(df, id, df_ref, id_type):
     """Plot a hydrograph of a specific basin.
 
     :param df:                   Input dataframe with data and basin id for a target basin
     :type df:                    dataframe
 
-    :param basin_id:             basin id
-    :type basin_id:              int
+    :param id:                  cell or basin id
+    :type id:                   int
 
     :param df_ref:              Reference dataframe with gis data
     :type df_ref                dataframe
+
+    :param id_type:              Type of ID passed, basin or cell
+    :type id_type                int
 
     """
 
     # Process dataframe and set up variables
     df['q'] = round(df['q'], 2)
     df['Runoff'] = df['q']
-    df_basin = df_ref[df_ref['basin_id'] == basin_id][0:1]
-    df_basin = df_basin['basin_name']
-    basin_name = df_basin.iat[0]
 
-    # Construct figure object
-    fig = px.line(df, x='Year', y='Runoff', title=f"Basin {basin_id} Runoff per Year")
-    fig.update_xaxes(nticks=len(df))
-    fig.update_layout(
-        title={
-            'text': f"<b>Basin {basin_id}: {basin_name} - Runoff per Year</b>",
+    if id_type == 'basin':
+        df_basin = df_ref[df_ref['basin_id'] == id][0:1]
+        df_basin = df_basin['basin_name']
+        basin_name = df_basin.iat[0]
+        title_text = {
+            'text': f"<b>Basin {id}: {basin_name} - Runoff per Year</b>",
             'y': 0.92,
             'x': 0.48,
             'xanchor': 'center',
@@ -362,7 +405,27 @@ def plot_hydrograph(df, basin_id, df_ref):
                 family='Roboto',
                 size=20
             ),
-        },
+        }
+        tick_format = ','
+    elif id_type == 'cell':
+        basin_name = df_ref[df_ref['grid_id'] == id]['basin_name'].iat[0]
+        title_text = {
+            'text': f"<b>Grid Cell {id}: {basin_name} - Runoff per Year</b>",
+            'y': 0.92,
+            'x': 0.48,
+            'xanchor': 'center',
+            'yanchor': 'top',
+            'font': dict(
+                family='Roboto',
+                size=20
+            ),
+        }
+        tick_format = ".2f"
+
+    # Construct figure object
+    fig = px.line(df, x='Year', y='Runoff', title=f"Basin {id} Runoff per Year")
+    fig.update_layout(
+        title=title_text,
         margin=go.layout.Margin(
             l=30,  # left margin
             r=60,  # right margin
@@ -371,9 +434,9 @@ def plot_hydrograph(df, basin_id, df_ref):
         ),
 
     )
-    fig.update_xaxes(title_text='Year')
-    fig.update_yaxes(title_text='km³/yr')
-    fig.update_layout(yaxis_tickformat=',')
+    fig.update_xaxes(nticks=len(df), title_text='Year')
+    fig.update_yaxes(title_text='km³/yr', tickformat=tick_format)
+    #fig.update_layout(yaxis_tickformat=',')
     return fig
 
 
@@ -522,6 +585,24 @@ def hydro_basin_lookup(basin_id, df_ref):
     return max(target_idx_list['grid_id'])
 
 
+def hydro_cell_lookup(cell_id, df_ref):
+    """Get max row of a particular basin's grid cells to reduce row count for performance
+
+    :param cell_id:             ID of cell
+    :type cell_id:              int
+
+    :param df_ref:               Reference dataframe
+    :type df_ref:                dataframe
+
+    :return:                     Max row of cell in file data
+
+    """
+
+    # get which grid cells are associated with the target basin
+    target_idx_list = df_ref[df_ref['grid_id'] == cell_id]
+    return max(target_idx_list['grid_id'])
+
+
 def update_choro_click(df_ref, df_per_basin, basin_features, mapbox_token, graph_click, start, end, statistic, units):
     """Return a choropleth figured object based off user click event
 
@@ -658,7 +739,7 @@ def update_choro_select(df_ref, df_per_basin, basin_features, year_list, mapbox_
     lat_max = subset['latitude'].max()
     lon = (lon_min + lon_max) / 2
     lat = (lat_min + lat_max) / 2
-    #custom_data = [[x, y] for x, y in zip(df_per_basin['basin_id'], df_per_basin['id'])]
+    # custom_data = [[x, y] for x, y in zip(df_per_basin['basin_id'], df_per_basin['id'])]
     fig = go.Figure(go.Choroplethmapbox(geojson=basin_features, locations=df_per_basin.basin_id,
                                         z=df_per_basin['Runoff (km³)'].astype(str), marker=dict(opacity=0.7),
                                         text=df_per_basin.apply(lambda row: f"<b>{row['basin_name']}</b><br>"
