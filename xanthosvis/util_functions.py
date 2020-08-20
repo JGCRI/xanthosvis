@@ -6,6 +6,7 @@ from zipfile import ZipFile
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objs as go
+import datetime
 import numpy as np
 
 
@@ -27,7 +28,7 @@ def get_available_years(in_file, non_year_fields=None):
         non_year_fields = ['id']
     in_file.drop(columns=non_year_fields, inplace=True)
 
-    return [{'label': i, 'value': i} for i in in_file.columns]
+    return [{'label': i if len(i) == 4 else i[0:4] + '-' + i[4:6], 'value': i} for i in in_file.columns]
 
 
 def available_through_years(available_year_list, start_year):
@@ -119,19 +120,19 @@ def data_per_basin(df, statistic, yr_list, df_ref):
 
     # calculate stat
     if statistic == 'mean':
-        grp['q'] = grp[yr_list].mean(axis=1)
+        grp['var'] = grp[yr_list].mean(axis=1)
 
     elif statistic == 'median':
-        grp['q'] = grp[yr_list].median(axis=1)
+        grp['var'] = grp[yr_list].median(axis=1)
 
     elif statistic == 'min':
-        grp['q'] = grp[yr_list].min(axis=1)
+        grp['var'] = grp[yr_list].min(axis=1)
 
     elif statistic == 'max':
-        grp['q'] = grp[yr_list].max(axis=1)
+        grp['var'] = grp[yr_list].max(axis=1)
 
     elif statistic == 'standard deviation':
-        grp['q'] = grp[yr_list].std(axis=1)
+        grp['var'] = grp[yr_list].std(axis=1)
 
     else:
         msg = f"The statistic requested '{statistic}' is not a valid option."
@@ -179,19 +180,19 @@ def data_per_cell(df, statistic, yr_list, df_ref):
 
     # Calculate stat
     if statistic == 'mean':
-        df['q'] = df[yr_list].mean(axis=1)
+        df['var'] = df[yr_list].mean(axis=1)
 
     elif statistic == 'median':
-        df['q'] = df[yr_list].median(axis=1)
+        df['var'] = df[yr_list].median(axis=1)
 
     elif statistic == 'min':
-        df['q'] = df[yr_list].min(axis=1)
+        df['var'] = df[yr_list].min(axis=1)
 
     elif statistic == 'max':
-        df['q'] = df[yr_list].max(axis=1)
+        df['var'] = df[yr_list].max(axis=1)
 
     elif statistic == 'standard deviation':
-        df['q'] = df[yr_list].std(axis=1)
+        df['var'] = df[yr_list].std(axis=1)
 
     else:
         msg = f"The statistic requested '{statistic}' is not a valid option."
@@ -239,7 +240,7 @@ def data_per_year_basin(df, basin_id, yr_list):
     dfx.drop(columns=['basin_id'], inplace=True)
     df = dfx.T.copy()
     df.reset_index(inplace=True)
-    df.columns = ['Year', 'q']
+    df.columns = ['Year', 'var']
 
     return df
 
@@ -266,9 +267,9 @@ def data_per_year_cell(df, cell_id, yr_list):
     keep_cols = yr_list
 
     # Adjust columns and reset index
-    #grp.drop(columns=['id'], inplace=True)
-    #grp = grp[keep_cols]
-    #grp.reset_index(inplace=True)
+    # grp.drop(columns=['id'], inplace=True)
+    # grp = grp[keep_cols]
+    # grp.reset_index(inplace=True)
 
     # Get only target basin_id
     # dfx = grp.loc[grp['basin_id'] == cell_id].copy()
@@ -277,12 +278,12 @@ def data_per_year_cell(df, cell_id, yr_list):
     # dfx.drop(columns=['basin_id'], inplace=True)
     # df = dfx.T.copy()
     # df.reset_index(inplace=True)
-    df = df[df['id'] == cell_id]
+    df = df[df['id'] == cell_id].copy()
     df.drop(columns=['basin_id', 'id'], inplace=True)
     df = df[keep_cols]
-    df = df.T
+    df = df.T.copy()
     df.reset_index(inplace=True)
-    df.columns = ['Year', 'q']
+    df.columns = ['Year', 'var']
 
     return df
 
@@ -304,6 +305,32 @@ def process_geojson(in_file):
         fx['id'] = fx['properties']['basin_id']
 
     return basin_features
+
+
+def get_unit_info(units):
+    if units[0] == "q":
+        data_type = "Runoff"
+    elif units[0] == "avgchflow":
+        data_type = "Streamflow"
+    elif units[0] == "aet":
+        data_type = "Actual ET"
+    elif units[0] == "pet":
+        data_type = "Potential ET"
+    else:
+        data_type = "unknown"
+    if len(units) > 1:
+        if units[1] == "km3peryear":
+            unit_type = "km³/y"
+        elif units[1] == "km3permonth":
+            unit_type = "km³/m"
+        elif units[1] == "m3persec":
+            unit_type = "m³/s"
+        else:
+            unit_type = "unknown"
+    else:
+        unit_type = "unknown"
+
+    return [data_type, unit_type]
 
 
 def plot_choropleth(df_per_basin, basin_features, mapbox_token, statistic, start, end, units):
@@ -332,22 +359,27 @@ def plot_choropleth(df_per_basin, basin_features, mapbox_token, statistic, start
 
     """
 
+    unit_labels = get_unit_info(units)
+    unit_type = unit_labels[0]
+    unit_display = unit_labels[1]
+
     fig = go.Figure(go.Choroplethmapbox(geojson=basin_features, locations=df_per_basin.basin_id,
-                                        z=df_per_basin['Runoff (km³)'].astype(str), marker=dict(opacity=0.7),
+                                        z=df_per_basin['var'].astype(str), marker=dict(opacity=0.7),
                                         text=df_per_basin.apply(lambda row: f"<b>{row['basin_name']}</b><br>"
                                                                             f"ID: {row['basin_id']}<br><br>"
-                                                                            f"Runoff (km³): {row['Runoff (km³)']} "
+                                                                            f"{unit_type} ({unit_display}): {row['var']} "
                                                                             f"({statistic})",
                                                                 axis=1), colorscale="Plasma",
                                         featureidkey="properties.basin_id", legendgroup="Runoff",
                                         hoverinfo="text",
                                         colorbar={'separatethousands': True, 'tickformat': ",",
-                                                  'title': 'Runoff (km³)'},
+                                                  'title': unit_type + ' ' + '(' + unit_display + ')'},
                                         customdata=df_per_basin['basin_id']))
 
     fig.update_layout(
         title={
-            'text': f"<b>Runoff ({statistic}) by Basin {start} - {end}</b>",
+            'text': f"<b>{unit_type} ({statistic}) by Basin {start if len(start) <= 4 else start[0:4] + '-' + start[4:6]} - "
+                    f"{end if len(end) <= 4 else end[0:4] + '-' + end[4:6]}</b>",
             'y': 0.94,
             'x': 0.5,
             'xanchor': 'center',
@@ -370,33 +402,45 @@ def plot_choropleth(df_per_basin, basin_features, mapbox_token, statistic, start
     return fig
 
 
-def plot_hydrograph(df, id, df_ref, id_type):
+def plot_hydrograph(df, selection_id, df_ref, id_type, units):
     """Plot a hydrograph of a specific basin.
 
     :param df:                   Input dataframe with data and basin id for a target basin
     :type df:                    dataframe
 
-    :param id:                  cell or basin id
-    :type id:                   int
+    :param selection_id:                  cell or basin id
+    :type selection_id:                   int
 
     :param df_ref:              Reference dataframe with gis data
     :type df_ref                dataframe
 
     :param id_type:              Type of ID passed, basin or cell
-    :type id_type                int
+    :type id_type                str
 
     """
+    unit_labels = get_unit_info(units)
+    unit_type = unit_labels[0]
+    unit_display = unit_labels[1]
 
     # Process dataframe and set up variables
-    df['q'] = round(df['q'], 2)
-    df['Runoff'] = df['q']
+    df['var'] = round(df['var'], 2)
+    title_text = ""
+    tick_format = ""
+    if len(df['Year'][0]) > 4:
+        df['Year'] = [datetime.datetime.strptime(i, "%Y%m") for i in df['Year']]
+        time_type = 'Month'
+    else:
+        time_type = 'Year'
+    nticks = len(df)
+    if nticks > 40:
+        nticks = 40
 
     if id_type == 'basin':
-        df_basin = df_ref[df_ref['basin_id'] == id][0:1]
+        df_basin = df_ref[df_ref['basin_id'] == selection_id][0:1]
         df_basin = df_basin['basin_name']
         basin_name = df_basin.iat[0]
         title_text = {
-            'text': f"<b>Basin {id}: {basin_name} - Runoff per Year</b>",
+            'text': f"<b>Basin {selection_id}: {basin_name} - {unit_type} per {time_type}</b>",
             'y': 0.92,
             'x': 0.48,
             'xanchor': 'center',
@@ -408,9 +452,9 @@ def plot_hydrograph(df, id, df_ref, id_type):
         }
         tick_format = ','
     elif id_type == 'cell':
-        basin_name = df_ref[df_ref['grid_id'] == id]['basin_name'].iat[0]
+        basin_name = df_ref[df_ref['grid_id'] == selection_id]['basin_name'].iat[0]
         title_text = {
-            'text': f"<b>Grid Cell {id}: {basin_name} - Runoff per Year</b>",
+            'text': f"<b>Grid Cell {selection_id}: {basin_name} - {unit_type} per {time_type}</b>",
             'y': 0.92,
             'x': 0.48,
             'xanchor': 'center',
@@ -423,7 +467,7 @@ def plot_hydrograph(df, id, df_ref, id_type):
         tick_format = ".2f"
 
     # Construct figure object
-    fig = px.line(df, x='Year', y='Runoff', title=f"Basin {id} Runoff per Year")
+    fig = px.line(df, x='Year', y='var', title=f"Basin {selection_id} {unit_type} per {time_type}")
     fig.update_layout(
         title=title_text,
         margin=go.layout.Margin(
@@ -434,26 +478,29 @@ def plot_hydrograph(df, id, df_ref, id_type):
         ),
 
     )
-    fig.update_xaxes(nticks=len(df), title_text='Year')
-    fig.update_yaxes(title_text='km³/yr', tickformat=tick_format)
-    #fig.update_layout(yaxis_tickformat=',')
+
+    fig.update_xaxes(nticks=nticks, title_text='Time')
+    fig.update_yaxes(title_text=unit_display, tickformat=tick_format)
+    # fig.update_layout(yaxis_tickformat=',')
     return fig
 
 
-def get_target_years(start, end):
+def get_target_years(start, end, options_list):
     """Return a string based list of the year range
 
        :param start:            Start Year
-       :type start:             int
+       :type start:             str
 
        :param end:              End year
-       :type end:               int
+       :type end:               str
 
        :return:                 list of years
 
     """
+    return [i['value'] for i in options_list if i['value'] <= end]
 
-    return [str(i) for i in range(int(start), int(end) + 1)]
+
+# return [str(i) for i in range(int(start[0:4]), int(end[0:4]) + 1)]
 
 
 def process_file(contents, filename, filedate, years, row_count="max"):
@@ -485,15 +532,6 @@ def process_file(contents, filename, filedate, years, row_count="max"):
         read_cols = "all"
     f = filename[0]
     split = f.split('_')
-    units = ""
-    unit_display = ""
-    if len(split) > 1:
-        units = split[1]
-    else:
-        unit_display = "km^3/yr"
-    if units == 'km3peryear':
-        unit_display = 'Km^3/yr'
-    zip_file = None
 
     # Try catch to process file based on type
     try:
@@ -543,7 +581,7 @@ def process_file(contents, filename, filedate, years, row_count="max"):
     except Exception as e:
         print(e)
         return None
-    return [xanthos_data, unit_display]
+    return [xanthos_data, split]
 
 
 def process_input_years(contents, filename, filedate):
@@ -581,7 +619,7 @@ def hydro_basin_lookup(basin_id, df_ref):
     """
 
     # get which grid cells are associated with the target basin
-    target_idx_list = df_ref[df_ref['basin_id'] == basin_id]
+    target_idx_list = df_ref[df_ref['basin_id'] == basin_id].copy()
     return max(target_idx_list['grid_id'])
 
 
@@ -599,7 +637,7 @@ def hydro_cell_lookup(cell_id, df_ref):
     """
 
     # get which grid cells are associated with the target basin
-    target_idx_list = df_ref[df_ref['grid_id'] == cell_id]
+    target_idx_list = df_ref[df_ref['grid_id'] == cell_id].copy()
     return max(target_idx_list['grid_id'])
 
 
@@ -638,7 +676,7 @@ def update_choro_click(df_ref, df_per_basin, basin_features, mapbox_token, graph
     """
 
     basin_id = graph_click['points'][0]['customdata'][0]
-    subset = df_ref[df_ref['basin_id'] == basin_id]
+    subset = df_ref[df_ref['basin_id'] == basin_id].copy()
     lon_min = subset['longitude'].min()
     lon_max = subset['longitude'].max()
     lat_min = subset['latitude'].min()
@@ -667,7 +705,8 @@ def update_choro_click(df_ref, df_per_basin, basin_features, mapbox_token, graph
 
     fig.update_layout(
         title={
-            'text': f"<b>Runoff ({statistic}) by Basin {start} - {end}</b>",
+            'text': f"<b>Runoff ({statistic}) by Basin {start if len(start) <= 4 else start[0:4] + '-' + start[4:6]} - "
+                    f"{end if len(end) <= 4 else end[0:4] + '-' + end[4:6]}</b>",
             'y': 0.94,
             'x': 0.5,
             'xanchor': 'center',
@@ -727,12 +766,17 @@ def update_choro_select(df_ref, df_per_basin, basin_features, year_list, mapbox_
     :return:                        Choropleth figure object
 
     """
+
+    unit_labels = get_unit_info(units)
+    unit_type = unit_labels[0]
+    unit_display = unit_labels[1]
+
     if selected_data['points'][0]['customdata'].__class__ == int:
         basin_id = [i['customdata'] for i in selected_data['points']]
     else:
         basin_id = [i['customdata'][0] for i in selected_data['points']]
     df_per_basin = df_per_basin[df_per_basin['basin_id'].isin(basin_id)]
-    subset = df_ref[df_ref['basin_id'].isin(basin_id)]
+    subset = df_ref[df_ref['basin_id'].isin(basin_id)].copy()
     lon_min = subset['longitude'].min()
     lon_max = subset['longitude'].max()
     lat_min = subset['latitude'].min()
@@ -741,21 +785,22 @@ def update_choro_select(df_ref, df_per_basin, basin_features, year_list, mapbox_
     lat = (lat_min + lat_max) / 2
     # custom_data = [[x, y] for x, y in zip(df_per_basin['basin_id'], df_per_basin['id'])]
     fig = go.Figure(go.Choroplethmapbox(geojson=basin_features, locations=df_per_basin.basin_id,
-                                        z=df_per_basin['Runoff (km³)'].astype(str), marker=dict(opacity=0.7),
+                                        z=df_per_basin['var'].astype(str), marker=dict(opacity=0.7),
                                         text=df_per_basin.apply(lambda row: f"<b>{row['basin_name']}</b><br>"
                                                                             f"ID: {row['basin_id']}<br><br>"
-                                                                            f"Runoff (km³): {row['Runoff (km³)']} "
+                                                                            f"{unit_type} ({unit_display}): {row['var']} "
                                                                             f"({statistic})",
                                                                 axis=1), colorscale="Plasma",
-                                        featureidkey="properties.basin_id", legendgroup="Runoff",
+                                        featureidkey="properties.basin_id", legendgroup=unit_type,
                                         hoverinfo="text",
                                         colorbar={'separatethousands': True, 'tickformat': ",",
-                                                  'title': 'Runoff (km³)'},
+                                                  'title': unit_type + ' (' + unit_display + ')'},
                                         customdata=df_per_basin['basin_id']))
 
     fig.update_layout(
         title={
-            'text': f"<b>Runoff ({statistic}) by Basin {start} - {end}</b>",
+            'text': f"<b>{unit_type} ({statistic}) by Basin {start if len(start) <= 4 else start[0:4] + '-' + start[4:6]} - "
+                    f"{end if len(end) <= 4 else end[0:4] + '-' + end[4:6]}</b>",
             'y': 0.94,
             'x': 0.5,
             'xanchor': 'center',
@@ -774,43 +819,6 @@ def update_choro_select(df_ref, df_per_basin, basin_features, year_list, mapbox_
         mapbox_style="mapbox://styles/jevanoff/ckckto2j900k01iomsh1f8i20",
         mapbox_accesstoken=mapbox_token, mapbox={'center': {'lat': lat, 'lon': lon}, 'zoom': 3}
     )
-    # fig = go.Figure(go.Scattermapbox(lat=df_selected['latitude'], lon=df_selected['longitude'],
-    #                                  mode='markers', customdata=df['basin_id'],
-    #                                  text=df_selected.apply(lambda row: f"<b>{row['basin_name']}</b><br>"
-    #                                                                     f"ID: {row['basin_id']}<br>"
-    #                                                                     f"Grid Cell: {row['id']}<br><br>"
-    #                                                                     f"Runoff (km³): {row['Runoff (km³)']} "
-    #                                                                     f"({statistic})",
-    #                                                         axis=1), hoverinfo="text",
-    #                                  # colorbar={'title': 'Runoff (km³)'},
-    #                                  marker=go.scattermapbox.Marker(
-    #                                      size=8,
-    #                                      color=df_selected['Runoff (km³)'],
-    #                                      opacity=0.4,
-    #                                      showscale=True
-    #                                  )
-    #                                  ))
-    # fig.update_layout(
-    #     title={
-    #         'text': f"<b>Runoff ({statistic}) by Basin {start} - {end}</b>",
-    #         'y': 0.94,
-    #         'x': 0.5,
-    #         'xanchor': 'center',
-    #         'yanchor': 'top',
-    #         'font': dict(
-    #             family='Roboto',
-    #             size=20
-    #         ),
-    #     },
-    #     margin=go.layout.Margin(
-    #         l=30,  # left margin
-    #         r=10,  # right margin
-    #         b=10,  # bottom margin
-    #         t=60  # top margin
-    #     ),
-    #     mapbox_style="mapbox://styles/jevanoff/ckckto2j900k01iomsh1f8i20",
-    #     mapbox_accesstoken=mapbox_token, mapbox={'center': {'lat': lat, 'lon': lon}, 'zoom': 3}
-    # )
 
     return fig
 
@@ -851,6 +859,11 @@ def update_choro_grid(df_ref, df, basin_features, year_list, mapbox_token, selec
     :return:                        Choropleth figure object
 
     """
+
+    unit_labels = get_unit_info(units)
+    unit_type = unit_labels[0]
+    unit_display = unit_labels[1]
+
     if selected_data is None:
         df_selected = data_per_cell(df, statistic, year_list, df_ref)
 
@@ -862,17 +875,17 @@ def update_choro_grid(df_ref, df, basin_features, year_list, mapbox_token, selec
                 basin_id = [i['customdata'][0] for i in selected_data['points']]
             df = df[df['basin_id'].isin(basin_id)]
             df_selected = data_per_cell(df, statistic, year_list, df_ref)
-            range = selected_data['range']['mapbox']
-            min_lon = min((range[0][0], range[1][0]))
-            max_lon = max((range[0][0], range[1][0]))
-            min_lat = min((range[0][1], range[1][1]))
-            max_lat = max((range[0][1], range[1][1]))
+            selected_range = selected_data['range']['mapbox']
+            min_lon = min((selected_range[0][0], selected_range[1][0]))
+            max_lon = max((selected_range[0][0], selected_range[1][0]))
+            min_lat = min((selected_range[0][1], selected_range[1][1]))
+            max_lat = max((selected_range[0][1], selected_range[1][1]))
         else:
-            range = selected_data['lassoPoints']['mapbox']
-            min_lon = min(x[0] for x in range)
-            max_lon = max(x[0] for x in range)
-            min_lat = min(x[1] for x in range)
-            max_lat = max(x[1] for x in range)
+            selected_range = selected_data['lassoPoints']['mapbox']
+            min_lon = min(x[0] for x in selected_range)
+            max_lon = max(x[0] for x in selected_range)
+            min_lat = min(x[1] for x in selected_range)
+            max_lat = max(x[1] for x in selected_range)
             if selected_data['points'][0]['customdata'].__class__ == int:
                 basin_id = [i['customdata'] for i in selected_data['points']]
                 df = df[df['basin_id'].isin(basin_id)]
@@ -882,7 +895,7 @@ def update_choro_grid(df_ref, df, basin_features, year_list, mapbox_token, selec
                 selected_points = [i['customdata'][1] for i in selected_data['points']]
                 df_selected = df_selected[df_selected['id'].isin(selected_points)]
 
-    df_selected['Runoff (km³)'] = round(df_selected['q'], 2)
+    df_selected['var'] = round(df_selected['var'], 2)
     lon_min = df_selected['longitude'].min()
     lon_max = df_selected['longitude'].max()
     lat_min = df_selected['latitude'].min()
@@ -916,21 +929,22 @@ def update_choro_grid(df_ref, df, basin_features, year_list, mapbox_token, selec
                                      text=df_selected.apply(lambda row: f"<b>{row['basin_name']}</b><br>"
                                                                         f"ID: {row['basin_id']}<br>"
                                                                         f"Grid Cell: {row['id']}<br><br>"
-                                                                        f"Runoff (km³): {row['Runoff (km³)']} "
+                                                                        f"{unit_type} ({unit_display}): {row['var']} "
                                                                         f"({statistic})",
                                                             axis=1), hoverinfo="text",
 
                                      marker=go.scattermapbox.Marker(
                                          size=14,
-                                         color=df_selected['Runoff (km³)'],
+                                         color=df_selected['var'],
                                          opacity=0.4,
                                          showscale=True,
-                                         colorbar={'title': 'Runoff (km³)'}
+                                         colorbar={'title': unit_type + '(' + unit_display + ')'}
                                      )
                                      ))
     fig.update_layout(
         title={
-            'text': f"<b>Runoff ({statistic}) by Basin {start} - {end}</b>",
+            'text': f"<b>{unit_type} ({statistic}) by Basin {start if len(start) <= 4 else start[0:4] + '-' + start[4:6]} - "
+                    f"{end if len(end) <= 4 else end[0:4] + '-' + end[4:6]}</b>",
             'y': 0.94,
             'x': 0.5,
             'xanchor': 'center',

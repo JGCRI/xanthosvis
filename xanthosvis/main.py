@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import math
 import os
 
 import dash
@@ -9,15 +8,15 @@ import dash_html_components as html
 import pandas as pd
 import seaborn as sns
 from dash.dependencies import Input, Output, State
-from flask_caching import Cache
 from dash.exceptions import PreventUpdate
+from flask_caching import Cache
 
 import xanthosvis.util_functions as xvu
 
 # ----- Define init options and system configuration
 
 # Dash init, define parameters and css information
-app = dash.Dash(__name__, external_stylesheets=['assets/base.css', 'assets/custom.css'], show_undo_redo=True,
+app = dash.Dash(__name__, external_stylesheets=['assets/base.css', 'assets/custom.css'],
                 meta_tags=[{"name": "viewport", "content": "width=device-width"}], suppress_callback_exceptions=True)
 cache = Cache(app.server, config={
     'CACHE_TYPE': 'filesystem',
@@ -73,11 +72,12 @@ acceptable_statistics = [{'label': 'Mean', 'value': 'mean'}, {'label': 'Median',
 app.layout = html.Div(
     children=[
         dcc.Store(id="select_store"),
+        dcc.Store(id="data_store"),
         html.Div(id="error-message"),
         html.Div(
             className="banner row",
             children=[
-                html.H2(className="h2-title", children="Xanthos Data Visualization"),
+                html.H2(className="h2-title", children="GCIMS Hydrologic Explorer"),
                 html.Div(
                     className="div-logo",
                     children=[
@@ -229,8 +229,8 @@ app.layout = html.Div(
                                                         "select group of basins and rescale the graph"),
                                                     html.Li(
                                                         "To view downscaled 0.5 degree resolution cell data, click "
-                                                        "the 'View as Gridded Data' box (note: best used on a subset "
-                                                        "of data due to processing time constraints)"),
+                                                        "the 'View as Gridded Data' toggle (note: best used on a subset"
+                                                        " of data due to processing time constraints)"),
                                                     html.Li(
                                                         "To reset the graph back to it's initial state, click the "
                                                         "'Reset Graph' button")
@@ -244,7 +244,7 @@ app.layout = html.Div(
                                         html.Div(
                                             children=[
                                             ]),
-                                        dcc.Loading(id='choro_loader',  children=[
+                                        dcc.Loading(id='choro_loader', children=[
                                             dcc.Graph(
                                                 id='choro_graph', figure={
                                                     'layout': {
@@ -276,17 +276,19 @@ app.layout = html.Div(
 # ----- Dash Callbacks
 
 # Callback to generate and load the choropleth graph when user clicks load data button or toggle grid view
-@app.callback([Output("tabs", "value"), Output("grid_toggle", "on"), Output("choro_graph", "figure")],
+
+@app.callback([Output("tabs", "value"), Output("grid_toggle", "on"), Output("choro_graph", "figure"),
+               Output("select_store" , 'data')],
               [Input("submit_btn", 'n_clicks'), Input("reset_btn", 'n_clicks'),  # Input("choro_graph", 'clickData'),
                Input("choro_graph", "selectedData"), Input("choro_graph", "relayoutData")],
               [State("grid_toggle", "on"), State("upload-data", "contents"), State("upload-data", "filename"),
                State("upload-data", "last_modified"),
                State("start_year", "value"), State("through_year", "value"),
-               State("statistic", "value"), State("choro_graph", "figure")],
+               State("statistic", "value"), State("choro_graph", "figure"),
+               State("through_year", "options"), State("select_store", 'data'), State("data_store", 'data')],
               prevent_initial_call=True)
-def update_choro(load_click, reset_click, selected_data, zoom_data, toggle_value, contents, filename, filedate, start,
-                 end,
-                 statistic, fig_info):
+def update_choro(load_click, reset_click, selected_data: dict, zoom_data, toggle_value, contents, filename, filedate,
+                 start, end, statistic, fig_info, through_options, store_state, data_state):
     """Generate choropleth figure based on input values and type of click event
 
        :param load_click:               Click event data for load button
@@ -297,6 +299,9 @@ def update_choro(load_click, reset_click, selected_data, zoom_data, toggle_value
 
        :param selected_data             Area select event data for the choropleth graph
        :type selected_data              dict
+
+       :param zoom_data                 Graph zoom level information
+       :type zoom_data                  dict
 
        :param toggle_value              Value of grid toggle switch
        :type toggle_value               int
@@ -320,7 +325,7 @@ def update_choro(load_click, reset_click, selected_data, zoom_data, toggle_value
        :type statistic                  str
 
        :param fig_info                  Current state of figure object
-       :type fig_info                   object
+       :type fig_info                   dict
 
        :return:                         Choropleth figure
 
@@ -336,29 +341,30 @@ def update_choro(load_click, reset_click, selected_data, zoom_data, toggle_value
             return 'info_tab', toggle_value, {
                 'data': [],
                 'layout': {}
-            }
+            }, store_state
 
         click_value = dash.callback_context.triggered[0]['value']
-        click_info = dash.callback_context. triggered[0]['prop_id']
+        click_info = dash.callback_context.triggered[0]['prop_id']
         if click_info == 'choro_graph.relayoutData':
             if type(click_value).__name__ == 'dict' and 'mapbox.zoom' in click_value.keys() and toggle_value is True:
-                fig_info['data'][0]['marker']['size'] = click_value['mapbox.zoom'] * 4.5
-                #fig_info['data'][0]['radius'] = math.ceil(click_value['mapbox.zoom'] * 3 + 1)
-                return 'output_tab', toggle_value, fig_info
+                fig_info['data'][0]['marker']['size'] = click_value['mapbox.zoom'] * 4
+                # fig_info['data'][0]['radius'] = math.ceil(click_value['mapbox.zoom'] * 3 + 1)
+                return 'output_tab', toggle_value, fig_info, store_state
             elif click_value != {'autosize': True}:
                 raise PreventUpdate
         # Process inputs (years, data) and set up variables
-        year_list = xvu.get_target_years(start, end)
+        year_list = xvu.get_target_years(start, end, through_options)
         data = xvu.process_file(contents, filename, filedate, years=year_list)
         xanthos_data = data[0]
-        units = data[1]
+        file_info = data[1]
         df = xvu.prepare_data(xanthos_data, df_ref)
         df_per_basin = xvu.data_per_basin(df, statistic, year_list, df_ref)
-        df_per_basin['Runoff (km³)'] = round(df_per_basin['q'], 2)
+        df_per_basin['var'] = round(df_per_basin['var'], 2)
 
         if click_info == 'reset_btn.n_clicks':
-            fig = xvu.plot_choropleth(df_per_basin, basin_features, mapbox_token, statistic, start, end, units)
-            return 'output_tab', False, fig
+            fig = xvu.plot_choropleth(df_per_basin, basin_features, mapbox_token, statistic, start, end, file_info)
+            store_state = None
+            return 'output_tab', False, fig, store_state
 
         # Generate figure based on type of click data (click, area select, or initial load)
         # if graph_click is not None and click_info == 'choro_graph.clickData':
@@ -366,39 +372,44 @@ def update_choro(load_click, reset_click, selected_data, zoom_data, toggle_value
         #                                  statistic, units)
 
         if selected_data is not None and click_info == 'choro_graph.selectedData':
+            store_state = selected_data
             if len(selected_data['points']) == 0:
-                fig = xvu.plot_choropleth(df_per_basin, basin_features, mapbox_token, statistic, start, end, units)
+                fig = xvu.plot_choropleth(df_per_basin, basin_features, mapbox_token, statistic, start, end, file_info)
             else:
                 if toggle_value is True:
                     fig = xvu.update_choro_grid(df_ref, df, basin_features, year_list, mapbox_token, selected_data,
-                                                start, end, statistic, units)
+                                                start, end, statistic, file_info)
                 else:
                     fig = xvu.update_choro_select(df_ref, df_per_basin, basin_features, year_list, mapbox_token,
-                                                  selected_data, start, end, statistic, units)
+                                                  selected_data, start, end, statistic, file_info)
 
         elif click_info == "grid_toggle.on":
+            if store_state is None:
+                selected_data = None
             if toggle_value is True:
                 fig = xvu.update_choro_grid(df_ref, df, basin_features, year_list, mapbox_token, selected_data,
-                                            start, end, statistic, units)
+                                            start, end, statistic, file_info)
             else:
                 fig = xvu.update_choro_select(df_ref, df_per_basin, basin_features, year_list, mapbox_token,
-                                              selected_data, start, end, statistic, units)
+                                              selected_data, start, end, statistic, file_info)
         else:
+            if store_state is None:
+                selected_data = None
             if selected_data is not None and len(selected_data['points']) != 0:
                 if toggle_value is True:
                     fig = xvu.update_choro_grid(df_ref, df, basin_features, year_list, mapbox_token, selected_data,
-                                                start, end, statistic, units)
+                                                start, end, statistic, file_info)
                 else:
                     fig = xvu.update_choro_select(df_ref, df_per_basin, basin_features, year_list, mapbox_token,
-                                                  selected_data, start, end, statistic, units)
+                                                  selected_data, start, end, statistic, file_info)
             else:
                 if toggle_value is True:
                     fig = xvu.update_choro_grid(df_ref, df, basin_features, year_list, mapbox_token, selected_data,
-                                                start, end, statistic, units)
+                                                start, end, statistic, file_info)
                 else:
-                    fig = xvu.plot_choropleth(df_per_basin, basin_features, mapbox_token, statistic, start, end, units)
+                    fig = xvu.plot_choropleth(df_per_basin, basin_features, mapbox_token, statistic, start, end, file_info)
 
-        return 'output_tab', toggle_value, fig
+        return 'output_tab', toggle_value, fig, store_state
 
     # If no contents, just return the blank map with instruction
     else:
@@ -406,15 +417,16 @@ def update_choro(load_click, reset_click, selected_data, zoom_data, toggle_value
 
         layout = {'title': 'Runoff by Basin (Upload data and click "View Data'}
         return 'info_tab', toggle_value, {
-                   'data': data,
-                   'layout': layout
-               }
+            'data': data,
+            'layout': layout
+        }, store_state
 
     # Callback to set start year options when file is uploaded and store data in upload component contents
 
 
 @app.callback(
-    [Output("start_year", "options"), Output("start_year", "value"), Output("upload-data", "children")],
+    [Output("start_year", "options"), Output("start_year", "value"), Output("upload-data", "children"),
+     Output("data_store", 'data')],
     [Input("upload-data", "contents")], [State('upload-data', 'filename'), State('upload-data', 'last_modified')],
     prevent_initial_call=True
 )
@@ -439,7 +451,7 @@ def update_options(contents, filename, filedate):
         target_years = xvu.process_input_years(contents, filename, filedate)
         name = filename[0]
         new_text = html.Div(["Using file " + name[:25] + '...' if (len(name) > 25) else "Using file " + name])
-        return target_years, target_years[0]['value'], new_text
+        return target_years, target_years[0]['value'], new_text, contents
 
 
 # Callback to set through year options when start year changes
@@ -481,10 +493,11 @@ def set_through_year_list(value, options, current_value):
     [Input('choro_graph', 'clickData'), Input("submit_btn", 'n_clicks')],
     [State('start_year', 'value'),
      State('through_year', 'value'),
-     State("upload-data", "contents"), State('upload-data', 'filename'), State('upload-data', 'last_modified')],
+     State("upload-data", "contents"), State('upload-data', 'filename'), State('upload-data', 'last_modified'),
+     State("through_year", "options")],
     prevent_initial_call=True
 )
-def update_hydro(click_data, n_click, start, end, contents, filename, filedate):
+def update_hydro(click_data, n_click, start, end, contents, filename, filedate, year_options):
     """Generate choropleth figure based on input values and type of click event
 
            :param click_data:               Click event data for the choropleth graph
@@ -539,19 +552,23 @@ def update_hydro(click_data, n_click, start, end, contents, filename, filedate):
                 location_type = 'cell'
 
         # Process years, basin/cell information
-        years = xvu.get_target_years(start, end)
+        years = xvu.get_target_years(start, end, year_options)
         if location_type == 'basin':
             max_basin_row = xvu.hydro_basin_lookup(location, df_ref)
-            file_data = xvu.process_file(contents, filename, filedate, years, max_basin_row)[0]
-            processed_data = xvu.prepare_data(file_data, df_ref)
+            data = xvu.process_file(contents, filename, filedate, years, max_basin_row)
+            xanthos_data = data[0]
+            file_info = data[1]
+            processed_data = xvu.prepare_data(xanthos_data, df_ref)
             hydro_data = xvu.data_per_year_basin(processed_data, location, years)
-            return xvu.plot_hydrograph(hydro_data, location, df_ref, 'basin')
+            return xvu.plot_hydrograph(hydro_data, location, df_ref, 'basin', file_info)
         elif location_type == 'cell':
             max_cell_row = xvu.hydro_cell_lookup(location, df_ref)
-            file_data = xvu.process_file(contents, filename, filedate, years, max_cell_row)[0]
-            processed_data = xvu.prepare_data(file_data, df_ref)
+            data = xvu.process_file(contents, filename, filedate, years, max_cell_row)
+            xanthos_data = data[0]
+            file_info = data[1]
+            processed_data = xvu.prepare_data(xanthos_data, df_ref)
             hydro_data = xvu.data_per_year_cell(processed_data, location, years)
-            return xvu.plot_hydrograph(hydro_data, location, df_ref, 'cell')
+            return xvu.plot_hydrograph(hydro_data, location, df_ref, 'cell', file_info)
     # Return nothing if there's no uploaded contents
     else:
         data = []
