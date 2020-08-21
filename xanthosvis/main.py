@@ -78,7 +78,7 @@ app.layout = html.Div(
         html.Div(
             className="banner row",
             children=[
-                html.H2(className="h2-title", children="GCIMS Hydrologic Explorer"),
+                html.H2(className="h2-title", children="GCIMS Hydrologic Explorer-"),
                 html.Div(
                     className="div-logo",
                     children=[
@@ -298,6 +298,7 @@ def update_choro(load_click, reset_click, selected_data: dict, zoom_data, toggle
        :param reset_click:             Click event data for reset button
        :type reset_click:              int
 
+
        :param selected_data             Area select event data for the choropleth graph
        :type selected_data              dict
 
@@ -422,13 +423,14 @@ def update_choro(load_click, reset_click, selected_data: dict, zoom_data, toggle
 
     # If no contents, just return the blank map with instruction
     else:
-        data = []
-
-        layout = {'title': 'Runoff by Basin (Upload data and click "View Data'}
-        return 'info_tab', toggle_value, {
-            'data': data,
-            'layout': layout
-        }, store_state
+        raise PreventUpdate
+        # data = []
+        #
+        # layout = {'title': 'Runoff by Basin (Upload data and click "View Data'}
+        # return 'info_tab', toggle_value, {
+        #     'data': data,
+        #     'layout': layout
+        # }, store_state
 
     # Callback to set start year options when file is uploaded and store data in upload component contents
 

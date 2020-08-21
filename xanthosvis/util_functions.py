@@ -396,7 +396,7 @@ def plot_choropleth(df_per_basin, basin_features, mapbox_token, statistic, start
             t=60  # top margin
         ),
         mapbox_style="mapbox://styles/jevanoff/ckckto2j900k01iomsh1f8i20",
-        mapbox_accesstoken=mapbox_token, mapbox={'zoom': 0}
+        mapbox_accesstoken=mapbox_token, mapbox={'zoom': 0.6}
     )
 
     return fig
