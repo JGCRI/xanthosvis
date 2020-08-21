@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
+import uuid
 
 import dash
 import dash_core_components as dcc
@@ -72,7 +73,7 @@ acceptable_statistics = [{'label': 'Mean', 'value': 'mean'}, {'label': 'Median',
 app.layout = html.Div(
     children=[
         dcc.Store(id="select_store"),
-        dcc.Store(id="data_store"),
+        dcc.Store(id="data_store", storage_type='memory'),
         html.Div(id="error-message"),
         html.Div(
             className="banner row",
@@ -278,7 +279,7 @@ app.layout = html.Div(
 # Callback to generate and load the choropleth graph when user clicks load data button or toggle grid view
 
 @app.callback([Output("tabs", "value"), Output("grid_toggle", "on"), Output("choro_graph", "figure"),
-               Output("select_store" , 'data')],
+               Output("select_store" , 'data')],#, Output("data_store", 'data')],
               [Input("submit_btn", 'n_clicks'), Input("reset_btn", 'n_clicks'),  # Input("choro_graph", 'clickData'),
                Input("choro_graph", "selectedData"), Input("choro_graph", "relayoutData")],
               [State("grid_toggle", "on"), State("upload-data", "contents"), State("upload-data", "filename"),
@@ -354,13 +355,21 @@ def update_choro(load_click, reset_click, selected_data: dict, zoom_data, toggle
                 raise PreventUpdate
         # Process inputs (years, data) and set up variables
         year_list = xvu.get_target_years(start, end, through_options)
-        data = xvu.process_file(contents, filename, filedate, years=year_list)
-        xanthos_data = data[0]
+        # if data_state is None:
+        #     data = xvu.process_file(contents, filename, filedate, years=year_list)
+        #     xanthos_data = data[0]
+        #     file_id = str(uuid.uuid4())
+        #     df = xvu.prepare_data(xanthos_data, df_ref)
+        #     data_state = file_id
+        #     cache.set(file_id, [df, data[1]])
+        # else:
+        #     data = cache.get(data_state)
+        #     df = data[0]
+        data = cache.get(data_state)
+        df = data[0]
         file_info = data[1]
-        df = xvu.prepare_data(xanthos_data, df_ref)
         df_per_basin = xvu.data_per_basin(df, statistic, year_list, df_ref)
         df_per_basin['var'] = round(df_per_basin['var'], 2)
-
         if click_info == 'reset_btn.n_clicks':
             fig = xvu.plot_choropleth(df_per_basin, basin_features, mapbox_token, statistic, start, end, file_info)
             store_state = None
@@ -451,7 +460,13 @@ def update_options(contents, filename, filedate):
         target_years = xvu.process_input_years(contents, filename, filedate)
         name = filename[0]
         new_text = html.Div(["Using file " + name[:25] + '...' if (len(name) > 25) else "Using file " + name])
-        return target_years, target_years[0]['value'], new_text, contents
+        data = xvu.process_file(contents, filename, filedate, years=None)
+        xanthos_data = data[0]
+        file_id = str(uuid.uuid4())
+        df = xvu.prepare_data(xanthos_data, df_ref)
+        data_state = file_id
+        cache.set(file_id, [df, data[1]])
+        return target_years, target_years[0]['value'], new_text, data_state
 
 
 # Callback to set through year options when start year changes
