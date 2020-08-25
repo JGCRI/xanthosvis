@@ -44,6 +44,25 @@ body{
     visibility: visible;
 }
 
+
+.form-row {
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  padding-bottom:7px;
+  padding-top:7px;
+ /* justify-content: center;  for centering 3 blocks in the center */
+  /* justify-content: space-between; for space in between */
+}
+
+.form-row:after {
+  content: "";
+  display: table;
+  clear: both; }
+
+.dash-dropdown {
+    width:50%;
+}
 .grid-label
 {
     display:inline;
@@ -176,20 +195,20 @@ h5{
 }
 
 .card{
-  padding:25px 20px 25px 20px;
+  padding:15px 20px 25px 20px;
   margin-left: 4%;
 	border-radius: 15px;
 }
 
 .card-left{
-  padding:32px 20px 32px 20px;
+  padding:20px 20px 32px 20px;
   margin-left: 0px;
 	border-radius: 15px;
 }
 
 .padding-top-bot{
-  padding-top: 10px;
-  padding-bottom: 15px;
+  padding-top: 7px;
+  padding-bottom: 10px;
 }
 
 .upload{

@@ -11,6 +11,8 @@ import seaborn as sns
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 from flask_caching import Cache
+import json
+
 
 import xanthosvis.util_functions as xvu
 
@@ -59,6 +61,10 @@ df_ref = pd.read_csv(gridcell_ref_file)
 # reference geojson file for basins
 basin_json = os.path.join(root_dir, 'reference', 'gcam_basins.geojson')
 basin_features = xvu.process_geojson(basin_json)
+
+world_json = os.path.join(root_dir, 'reference', 'world.geojson')
+with open(world_json, encoding='utf-8-sig', errors='ignore') as get:
+    country_features = json.load(get)
 
 # Runoff Statistic for the Choropleth Map
 acceptable_statistics = [{'label': 'Mean', 'value': 'mean'}, {'label': 'Median', 'value': 'median'},
@@ -117,8 +123,8 @@ app.layout = html.Div(
                                                 ]),
                                                 style={
                                                     'width': '100%',
-                                                    'height': '60px',
-                                                    'lineHeight': '60px',
+                                                    'height': '35px',
+                                                    'lineHeight': '35px',
                                                     'borderWidth': '1px',
                                                     'borderStyle': 'dashed',
                                                     'borderRadius': '5px',
@@ -132,40 +138,116 @@ app.layout = html.Div(
                                 ),
 
                                 html.Div(
-                                    className="padding-top-bot",
+                                    className="form-row",
                                     children=[
-                                        html.H6("Choose Statistic:"),
+                                        html.Div(
+                                            style=dict(
+                                                width='50%',
+                                                verticalAlign="middle"),
+                                            children=[
+                                                html.H6("Choose Statistic:")
+                                            ]
+                                        ),
+
                                         dcc.Dropdown(
                                             id='statistic',
                                             className="loader",
                                             options=[{'label': i['label'], 'value': i['value']} for i in
                                                      acceptable_statistics],
-                                            value=acceptable_statistics[0]['value'], clearable=False
+                                            value=acceptable_statistics[0]['value'], clearable=False,
+                                            style=dict(
+                                                # width='50%',
+                                                verticalAlign="middle"
+                                            )
                                         ),
                                     ],
                                 ),
                                 html.Div(
-                                    className="padding-top-bot",
+                                    className="form-row",
                                     children=[
-                                        html.H6("Choose Starting Year:"),
+                                        html.Div(
+                                            style=dict(
+                                                width='50%',
+                                                verticalAlign="middle"),
+                                            children=[
+                                                html.H6("Choose Starting Year:"),
+                                            ]
+                                        ),
                                         dcc.Dropdown(
                                             id='start_year',
+
                                             className="loader",
                                             options=[],
-                                            clearable=False
+                                            clearable=False,
+                                            style=dict(
+                                                # width='50%',
+                                                verticalAlign="middle"
+                                            )
                                         ),
                                     ],
                                 ),
                                 html.Div(
-                                    className="padding-top-bot",
+                                    className="form-row",
                                     children=[
-                                        html.H6("Choose End Year:"),
+                                        html.Div(
+                                            style=dict(
+                                                width='50%',
+                                                verticalAlign="middle"),
+                                            children=[
+                                                html.H6("Choose End Year:"),
+                                            ]
+                                        ),
                                         dcc.Dropdown(
                                             id='through_year',
                                             className="loader",
-                                            options=[], clearable=False
+                                            options=[], clearable=False,
+                                            style=dict(
+                                                # width='50%',
+                                                verticalAlign="middle"
+                                            )
                                         ),
                                     ],
+                                ),
+                                html.Div(
+                                    className="form-row",
+                                    children=[
+                                        html.Div(
+                                            style=dict(
+                                                width='50%',
+                                                verticalAlign="middle"),
+                                            children=[
+                                                html.H6("Choose Country:"),
+                                            ]
+                                        ),
+                                        dcc.Dropdown(
+                                            id='country_select',
+                                            className="loader",
+                                            options=sorted([{'label': i['properties']['sovereignt'], 'value' :
+                                                            i['properties']['sovereignt']} for i in
+                                                            country_features['features']], key=lambda x: x["label"]),
+                                            clearable=True,
+                                            style=dict(
+                                                # width='50%',
+                                                verticalAlign="middle"
+                                            )
+                                        ),
+                                    ],
+                                ),
+                                html.Div(
+                                    className="padding-top-bot",
+                                    children=[
+                                        html.H6("Choose Months:"),
+                                        dcc.Dropdown(
+                                            id='months_select',
+                                            options=[],
+                                            multi=True,
+                                            style=dict(
+                                                height='110px',
+                                                width='100%',
+                                                verticalAlign="middle"
+                                            )
+                                        )
+                                    ]
                                 ),
                                 html.Div(
                                     className="padding-top-bot",
@@ -279,17 +361,17 @@ app.layout = html.Div(
 # Callback to generate and load the choropleth graph when user clicks load data button or toggle grid view
 
 @app.callback([Output("tabs", "value"), Output("grid_toggle", "on"), Output("choro_graph", "figure"),
-               Output("select_store" , 'data')],#, Output("data_store", 'data')],
-              [Input("submit_btn", 'n_clicks'), Input("reset_btn", 'n_clicks'),  # Input("choro_graph", 'clickData'),
-               Input("choro_graph", "selectedData"), Input("choro_graph", "relayoutData")],
-              [State("grid_toggle", "on"), State("upload-data", "contents"), State("upload-data", "filename"),
-               State("upload-data", "last_modified"),
-               State("start_year", "value"), State("through_year", "value"),
-               State("statistic", "value"), State("choro_graph", "figure"),
-               State("through_year", "options"), State("select_store", 'data'), State("data_store", 'data')],
+               Output("select_store", 'data')],
+              [Input("submit_btn", 'n_clicks'), Input("reset_btn", 'n_clicks'), Input("choro_graph", "selectedData"),
+               Input("choro_graph", "relayoutData")],
+              [State("months_select", "value"), State("grid_toggle", "on"), State("upload-data", "contents"),
+               State("upload-data", "filename"), State("upload-data", "last_modified"), State("start_year", "value"),
+               State("through_year", "value"), State("statistic", "value"), State("choro_graph", "figure"),
+               State("through_year", "options"), State("select_store", 'data'), State("data_store", 'data'),
+               State("country_select", "value")],
               prevent_initial_call=True)
-def update_choro(load_click, reset_click, selected_data: dict, zoom_data, toggle_value, contents, filename, filedate,
-                 start, end, statistic, fig_info, through_options, store_state, data_state):
+def update_choro(load_click, reset_click, selected_data: dict, zoom_data, months, toggle_value, contents, filename,
+                 filedate, start, end, statistic, fig_info, through_options, store_state, data_state, country):
     """Generate choropleth figure based on input values and type of click event
 
        :param load_click:               Click event data for load button
@@ -333,7 +415,9 @@ def update_choro(load_click, reset_click, selected_data: dict, zoom_data, toggle
 
        """
     # Don't process anything unless there's contents in the file upload component
-    if contents:
+    if contents and dash.callback_context.triggered[0]['prop_id'] in ['submit_btn.n_clicks',
+                                                                      'choro_graph.selectedData',
+                                                                      'choro_graph.relayoutData']:
         # Check for valid inputs
         if start > end:
             error_message = html.Div(
@@ -356,21 +440,21 @@ def update_choro(load_click, reset_click, selected_data: dict, zoom_data, toggle
                 raise PreventUpdate
         # Process inputs (years, data) and set up variables
         year_list = xvu.get_target_years(start, end, through_options)
-        # if data_state is None:
-        #     data = xvu.process_file(contents, filename, filedate, years=year_list)
-        #     xanthos_data = data[0]
-        #     file_id = str(uuid.uuid4())
-        #     df = xvu.prepare_data(xanthos_data, df_ref)
-        #     data_state = file_id
-        #     cache.set(file_id, [df, data[1]])
-        # else:
-        #     data = cache.get(data_state)
-        #     df = data[0]
+
         data = cache.get(data_state)
         df = data[0]
         file_info = data[1]
-        df_per_basin = xvu.data_per_basin(df, statistic, year_list, df_ref)
-        df_per_basin['var'] = round(df_per_basin['var'], 2)
+
+        if country is not None and len(country) > 0:
+            df_per_country = xvu.data_per_country(df, statistic, year_list, df_ref, months)
+            df_per_country['var'] = round(df_per_country['var'], 2)
+            fig = xvu.plot_geo_choropleth(df, country_features, mapbox_token, statistic, start, end, file_info)
+            store_state = None
+            return 'output_tab', False, fig, store_state
+
+        if toggle_value is False:
+            df_per_basin = xvu.data_per_basin(df, statistic, year_list, df_ref, months)
+            df_per_basin['var'] = round(df_per_basin['var'], 2)
         if click_info == 'reset_btn.n_clicks':
             fig = xvu.plot_choropleth(df_per_basin, basin_features, mapbox_token, statistic, start, end, file_info)
             store_state = None
@@ -384,11 +468,12 @@ def update_choro(load_click, reset_click, selected_data: dict, zoom_data, toggle
         if selected_data is not None and click_info == 'choro_graph.selectedData':
             store_state = selected_data
             if len(selected_data['points']) == 0:
-                fig = xvu.plot_choropleth(df_per_basin, basin_features, mapbox_token, statistic, start, end, file_info)
+                fig = xvu.plot_choropleth(df_per_basin, basin_features, mapbox_token, statistic, start, end, file_info,
+                                          months)
             else:
                 if toggle_value is True:
                     fig = xvu.update_choro_grid(df_ref, df, basin_features, year_list, mapbox_token, selected_data,
-                                                start, end, statistic, file_info)
+                                                start, end, statistic, file_info, months)
                 else:
                     fig = xvu.update_choro_select(df_ref, df_per_basin, basin_features, year_list, mapbox_token,
                                                   selected_data, start, end, statistic, file_info)
@@ -398,7 +483,7 @@ def update_choro(load_click, reset_click, selected_data: dict, zoom_data, toggle
                 selected_data = None
             if toggle_value is True:
                 fig = xvu.update_choro_grid(df_ref, df, basin_features, year_list, mapbox_token, selected_data,
-                                            start, end, statistic, file_info)
+                                            start, end, statistic, file_info, months)
             else:
                 fig = xvu.update_choro_select(df_ref, df_per_basin, basin_features, year_list, mapbox_token,
                                               selected_data, start, end, statistic, file_info)
@@ -408,16 +493,17 @@ def update_choro(load_click, reset_click, selected_data: dict, zoom_data, toggle
             if selected_data is not None and len(selected_data['points']) != 0:
                 if toggle_value is True:
                     fig = xvu.update_choro_grid(df_ref, df, basin_features, year_list, mapbox_token, selected_data,
-                                                start, end, statistic, file_info)
+                                                start, end, statistic, file_info, months)
                 else:
                     fig = xvu.update_choro_select(df_ref, df_per_basin, basin_features, year_list, mapbox_token,
                                                   selected_data, start, end, statistic, file_info)
             else:
                 if toggle_value is True:
                     fig = xvu.update_choro_grid(df_ref, df, basin_features, year_list, mapbox_token, selected_data,
-                                                start, end, statistic, file_info)
+                                                start, end, statistic, file_info, months)
                 else:
-                    fig = xvu.plot_choropleth(df_per_basin, basin_features, mapbox_token, statistic, start, end, file_info)
+                    fig = xvu.plot_choropleth(df_per_basin, basin_features, mapbox_token, statistic, start, end,
+                                              file_info)
 
         return 'output_tab', toggle_value, fig, store_state
 
@@ -437,7 +523,7 @@ def update_choro(load_click, reset_click, selected_data: dict, zoom_data, toggle
 
 @app.callback(
     [Output("start_year", "options"), Output("start_year", "value"), Output("upload-data", "children"),
-     Output("data_store", 'data')],
+     Output("data_store", 'data'), Output("months_select", "options")],
     [Input("upload-data", "contents")], [State('upload-data', 'filename'), State('upload-data', 'last_modified')],
     prevent_initial_call=True
 )
@@ -459,7 +545,11 @@ def update_options(contents, filename, filedate):
     # Check if there is uploaded content
     if contents:
         # Process contents for available years
-        target_years = xvu.process_input_years(contents, filename, filedate)
+        target_years, months_list = xvu.process_input_years(contents, filename, filedate)
+        if months_list is None:
+            months = []
+        else:
+            months = xvu.get_available_months(months_list)
         name = filename[0]
         new_text = html.Div(["Using file " + name[:25] + '...' if (len(name) > 25) else "Using file " + name])
         data = xvu.process_file(contents, filename, filedate, years=None)
@@ -468,7 +558,7 @@ def update_options(contents, filename, filedate):
         df = xvu.prepare_data(xanthos_data, df_ref)
         data_state = file_id
         cache.set(file_id, [df, data[1]])
-        return target_years, target_years[0]['value'], new_text, data_state
+        return target_years, target_years[0]['value'], new_text, data_state, months
 
 
 # Callback to set through year options when start year changes
@@ -511,10 +601,10 @@ def set_through_year_list(value, options, current_value):
     [State('start_year', 'value'),
      State('through_year', 'value'),
      State("upload-data", "contents"), State('upload-data', 'filename'), State('upload-data', 'last_modified'),
-     State("through_year", "options")],
+     State("through_year", "options"), State('months_select', 'value')],
     prevent_initial_call=True
 )
-def update_hydro(click_data, n_click, start, end, contents, filename, filedate, year_options):
+def update_hydro(click_data, n_click, start, end, contents, filename, filedate, year_options, months):
     """Generate choropleth figure based on input values and type of click event
 
            :param click_data:               Click event data for the choropleth graph
@@ -576,7 +666,7 @@ def update_hydro(click_data, n_click, start, end, contents, filename, filedate, 
             xanthos_data = data[0]
             file_info = data[1]
             processed_data = xvu.prepare_data(xanthos_data, df_ref)
-            hydro_data = xvu.data_per_year_basin(processed_data, location, years)
+            hydro_data = xvu.data_per_year_basin(processed_data, location, years, months)
             return xvu.plot_hydrograph(hydro_data, location, df_ref, 'basin', file_info)
         elif location_type == 'cell':
             max_cell_row = xvu.hydro_cell_lookup(location, df_ref)
@@ -584,7 +674,7 @@ def update_hydro(click_data, n_click, start, end, contents, filename, filedate, 
             xanthos_data = data[0]
             file_info = data[1]
             processed_data = xvu.prepare_data(xanthos_data, df_ref)
-            hydro_data = xvu.data_per_year_cell(processed_data, location, years)
+            hydro_data = xvu.data_per_year_cell(processed_data, location, years, months)
             return xvu.plot_hydrograph(hydro_data, location, df_ref, 'cell', file_info)
     # Return nothing if there's no uploaded contents
     else:

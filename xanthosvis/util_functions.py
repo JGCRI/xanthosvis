@@ -27,9 +27,44 @@ def get_available_years(in_file, non_year_fields=None):
     if non_year_fields is None:
         non_year_fields = ['id']
     in_file.drop(columns=non_year_fields, inplace=True)
+    year_list = list()
+    year_list = [{'label': i if len(i) == 4 else i[0:4] + '-' + i[4:6], 'value': i} for i in in_file.columns]
+    month_list = list()
+    if len(in_file.columns[0]) == 6:
+        month_list = np.unique([i[4:6] for i in in_file.columns])
+    else:
+        month_list = None
+    return year_list, month_list
 
-    return [{'label': i if len(i) == 4 else i[0:4] + '-' + i[4:6], 'value': i} for i in in_file.columns]
 
+def get_available_months(months_list):
+    months = list()
+    if "01" in months_list:
+        months.append({'label': "January", 'value': "01"})
+    if "02" in months_list:
+        months.append({'label': "February", 'value': "02"})
+    if "03" in months_list:
+        months.append({'label': "March", 'value': "03"})
+    if "04" in months_list:
+        months.append({'label': "April", 'value': "04"})
+    if "05" in months_list:
+        months.append({'label': "May", 'value': "05"})
+    if "06" in months_list:
+        months.append({'label': "June", 'value': "06"})
+    if "07" in months_list:
+        months.append({'label': "July", 'value': "07"})
+    if "08" in months_list:
+        months.append({'label': "August", 'value': "08"})
+    if "09" in months_list:
+        months.append({'label': "September", 'value': "09"})
+    if "10" in months_list:
+        months.append({'label': "October", 'value': "10"})
+    if "11" in months_list:
+        months.append({'label': "November", 'value': "11"})
+    if "12" in months_list:
+        months.append({'label': "December", 'value': "12"})
+
+    return months
 
 def available_through_years(available_year_list, start_year):
     """Return a list of available through years that are >= the start year.
@@ -71,6 +106,25 @@ def basin_to_gridcell_dict(df_reference):
     return df_reference.to_dict()['basin_id']
 
 
+def country_to_gridcell_dict(df_reference):
+    """Generate a dictionary of gridcell id to basin id {grid_id: basin_id}
+
+    :param df_reference:            Input data reference dataframe
+    :type df_reference:             dataframe
+
+    :return:                        dict. {grid_id: basin_id}
+
+    """
+
+    # select target fields
+    df_reference = df_reference[['grid_id', 'basin_id']]
+
+    # set index that will become dictionary key
+    df_reference.set_index('grid_id', inplace=True)
+
+    return df_reference.to_dict()['basin_id']
+
+
 def prepare_data(df, df_ref):
     """Process dataframe to add the basin id from reference file.
 
@@ -93,7 +147,7 @@ def prepare_data(df, df_ref):
     return df
 
 
-def data_per_basin(df, statistic, yr_list, df_ref):
+def data_per_basin(df, statistic, yr_list, df_ref, months):
     """Generate a data frame representing data per basin for all years
     represented by an input statistic.
 
@@ -112,6 +166,15 @@ def data_per_basin(df, statistic, yr_list, df_ref):
     :return:                        dataframe; grouped by basin for statistic
 
     """
+
+    if months is not None and len(months) > 0:
+        yr_list = [c for c in yr_list if c[4:6] in months]
+    #     df = df.drop(axis=1,[if i[4:6] in months for i in df.columns] ) #np.unique([i[4:6] for i in df.columns])
+    #     [x for x in df.columns[df.columns.str.contains()]]
+    #     df.filter(regex='^201')
+    #     cols = [c for c in df.columns if c[4:6] not in months]
+    #
+    #     df = df[cols]
 
     # sum data by basin by year
     grp = df.groupby('basin_id').sum()
@@ -149,7 +212,7 @@ def data_per_basin(df, statistic, yr_list, df_ref):
     return grp
 
 
-def data_per_cell(df, statistic, yr_list, df_ref):
+def data_per_cell(df, statistic, yr_list, df_ref, months):
     """Generate a data frame representing data per basin for all years
     represented by an input statistic.
 
@@ -168,6 +231,8 @@ def data_per_cell(df, statistic, yr_list, df_ref):
     :return:                        dataframe; grouped by basin for statistic
 
     """
+    if months is not None and len(months) > 0:
+        yr_list = [c for c in yr_list if c[4:6] in months]
 
     # Set up column list for joins
     column_list = list(df)
@@ -207,7 +272,72 @@ def data_per_cell(df, statistic, yr_list, df_ref):
     return df
 
 
-def data_per_year_basin(df, basin_id, yr_list):
+def data_per_country(df, statistic, yr_list, df_ref, months):
+    """Generate a data frame representing data per basin for all years
+    represented by an input statistic.
+
+    :param df:                      Data with basin id
+    :type df:                       dataframe
+
+    :param statistic:               statistic name from user input
+    :type statistic:                str
+
+    :param yr_list:                 List of years to process
+    :type yr_list:                  list
+
+    :param df_ref                   Reference dataframe
+    :type df_ref                    dataframe
+
+    :return:                        dataframe; grouped by basin for statistic
+
+    """
+
+    if months is not None and len(months) > 0:
+        yr_list = [c for c in yr_list if c[4:6] in months]
+    #     df = df.drop(axis=1,[if i[4:6] in months for i in df.columns] ) #np.unique([i[4:6] for i in df.columns])
+    #     [x for x in df.columns[df.columns.str.contains()]]
+    #     df.filter(regex='^201')
+    #     cols = [c for c in df.columns if c[4:6] not in months]
+    #
+    #     df = df[cols]
+
+    # sum data by basin by year
+    grp = df.groupby('basin_id').sum()
+
+    grp.drop(columns=['id'], inplace=True)
+
+    # calculate stat
+    if statistic == 'mean':
+        grp['var'] = grp[yr_list].mean(axis=1)
+
+    elif statistic == 'median':
+        grp['var'] = grp[yr_list].median(axis=1)
+
+    elif statistic == 'min':
+        grp['var'] = grp[yr_list].min(axis=1)
+
+    elif statistic == 'max':
+        grp['var'] = grp[yr_list].max(axis=1)
+
+    elif statistic == 'standard deviation':
+        grp['var'] = grp[yr_list].std(axis=1)
+
+    else:
+        msg = f"The statistic requested '{statistic}' is not a valid option."
+        raise ValueError(msg)
+
+    #  Drop unneeded columns
+    grp.drop(columns=yr_list, inplace=True)
+
+    # Map basin values using df_ref
+    grp.reset_index(inplace=True)
+    mapping = dict(df_ref[['basin_id', 'basin_name']].values)
+    grp['basin_name'] = grp.basin_id.map(mapping)
+
+    return grp
+
+
+def data_per_year_basin(df, basin_id, yr_list, months):
     """Generate a data frame representing the sum of the data per year for a target basin.
 
     :param df:                      input data having data per year
@@ -222,6 +352,9 @@ def data_per_year_basin(df, basin_id, yr_list):
     :return:                        dataframe; sum values per year for a target basin
 
     """
+
+    if months is not None and len(months) > 0:
+        yr_list = [c for c in yr_list if c[4:6] in months]
 
     # Sum data by basin by year
     grp = df.groupby('basin_id').sum()
@@ -245,7 +378,7 @@ def data_per_year_basin(df, basin_id, yr_list):
     return df
 
 
-def data_per_year_cell(df, cell_id, yr_list):
+def data_per_year_cell(df, cell_id, yr_list, months):
     """Generate a data frame representing the sum of the data per year for a target basin.
 
     :param df:                      input data having data per year
@@ -263,6 +396,9 @@ def data_per_year_cell(df, cell_id, yr_list):
 
     # Sum data by basin by year
     # grp = df.groupby('basin_id').sum()
+
+    if months is not None and len(months) > 0:
+        yr_list = [c for c in yr_list if c[4:6] in months]
 
     keep_cols = yr_list
 
@@ -332,6 +468,49 @@ def get_unit_info(units):
 
     return [data_type, unit_type]
 
+
+def plot_geo_choropleth(df_per_country, country_features, mapbox_token, statistic, start, end, units):
+    unit_labels = get_unit_info(units)
+    unit_type = unit_labels[0]
+    unit_display = unit_labels[1]
+
+    fig = go.Figure(go.Choroplethmapbox(geojson=country_features, locations=df_per_country.basin_id,
+                                        z=df_per_country['var'].astype(str), marker=dict(opacity=0.7),
+                                        text=df_per_country.apply(lambda row: f"<b>{row['basin_name']}</b><br>"
+                                                                            f"ID: {row['basin_id']}<br><br>"
+                                                                            f"{unit_type} ({unit_display}): {row['var']} "
+                                                                            f"({statistic})",
+                                                                  axis=1), colorscale="Plasma",
+                                        featureidkey="properties.basin_id", legendgroup="Runoff",
+                                        hoverinfo="text",
+                                        colorbar={'separatethousands': True, 'tickformat': ",",
+                                                  'title': unit_type + ' ' + '(' + unit_display + ')'},
+                                        customdata=df_per_country['basin_id']))
+
+    fig.update_layout(
+        title={
+            'text': f"<b>{unit_type} ({statistic}) by Basin {start if len(start) <= 4 else start[0:4] + '-' + start[4:6]} - "
+                    f"{end if len(end) <= 4 else end[0:4] + '-' + end[4:6]}</b>",
+            'y': 0.94,
+            'x': 0.5,
+            'xanchor': 'center',
+            'yanchor': 'top',
+            'font': dict(
+                family='Roboto',
+                size=20
+            ),
+        },
+        margin=go.layout.Margin(
+            l=30,  # left margin
+            r=10,  # right margin
+            b=10,  # bottom margin
+            t=60  # top margin
+        ),
+        mapbox_style="mapbox://styles/jevanoff/ckckto2j900k01iomsh1f8i20",
+        mapbox_accesstoken=mapbox_token, mapbox={'zoom': 0.6}
+    )
+
+    return fig
 
 def plot_choropleth(df_per_basin, basin_features, mapbox_token, statistic, start, end, units):
     """Plot interactive choropleth map for basin level statistics.
@@ -498,9 +677,6 @@ def get_target_years(start, end, options_list):
 
     """
     return [i['value'] for i in options_list if i['value'] <= end]
-
-
-# return [str(i) for i in range(int(start[0:4]), int(end[0:4]) + 1)]
 
 
 def process_file(contents, filename, filedate, years, row_count="max"):
@@ -823,7 +999,8 @@ def update_choro_select(df_ref, df_per_basin, basin_features, year_list, mapbox_
     return fig
 
 
-def update_choro_grid(df_ref, df, basin_features, year_list, mapbox_token, selected_data, start, end, statistic, units):
+def update_choro_grid(df_ref, df, basin_features, year_list, mapbox_token, selected_data, start, end, statistic, units,
+                      months):
     """Return a choropleth figured object based off user area select event
 
     :param df_ref:                  Reference dataframe
@@ -865,7 +1042,7 @@ def update_choro_grid(df_ref, df, basin_features, year_list, mapbox_token, selec
     unit_display = unit_labels[1]
 
     if selected_data is None:
-        df_selected = data_per_cell(df, statistic, year_list, df_ref)
+        df_selected = data_per_cell(df, statistic, year_list, df_ref, months)
 
     else:
         if 'range' in selected_data.keys():
@@ -874,7 +1051,7 @@ def update_choro_grid(df_ref, df, basin_features, year_list, mapbox_token, selec
             else:
                 basin_id = [i['customdata'][0] for i in selected_data['points']]
             df = df[df['basin_id'].isin(basin_id)]
-            df_selected = data_per_cell(df, statistic, year_list, df_ref)
+            df_selected = data_per_cell(df, statistic, year_list, df_ref, months)
             selected_range = selected_data['range']['mapbox']
             min_lon = min((selected_range[0][0], selected_range[1][0]))
             max_lon = max((selected_range[0][0], selected_range[1][0]))
