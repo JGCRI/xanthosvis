@@ -13,7 +13,6 @@ from dash.exceptions import PreventUpdate
 from flask_caching import Cache
 import json
 
-
 import xanthosvis.util_functions as xvu
 
 # ----- Define init options and system configuration
@@ -216,21 +215,29 @@ app.layout = html.Div(
                                                 width='50%',
                                                 verticalAlign="middle"),
                                             children=[
-                                                html.H6("Choose Country:"),
+                                                html.H6("Choose View By:"),
                                             ]
                                         ),
-                                        dcc.Dropdown(
-                                            id='country_select',
-                                            className="loader",
-                                            options=sorted([{'label': i['properties']['sovereignt'], 'value' :
-                                                            i['properties']['sovereignt']} for i in
-                                                            country_features['features']], key=lambda x: x["label"]),
-                                            clearable=True,
-                                            style=dict(
-                                                # width='50%',
-                                                verticalAlign="middle"
-                                            )
-                                        ),
+                                        dcc.RadioItems(
+                                            options=[
+                                                {'label': 'GCAM Basin', 'value': 'gcam'},
+                                                {'label': 'Country', 'value': 'country'}
+                                            ],
+                                            value='gcam',
+                                            labelStyle={'display': 'inline-block'}
+                                        )
+                                        # dcc.Dropdown(
+                                        #     id='country_select',
+                                        #     className="loader",
+                                        #     options=sorted([{'label': i['properties']['sovereignt'], 'value' :
+                                        #                     i['properties']['sovereignt']} for i in
+                                        #                     country_features['features']], key=lambda x: x["label"]),
+                                        #     clearable=True,
+                                        #     style=dict(
+                                        #         # width='50%',
+                                        #         verticalAlign="middle"
+                                        #     )
+                                        # ),
                                     ],
                                 ),
                                 html.Div(
@@ -371,7 +378,7 @@ app.layout = html.Div(
                State("country_select", "value")],
               prevent_initial_call=True)
 def update_choro(load_click, reset_click, selected_data: dict, zoom_data, months, toggle_value, contents, filename,
-                 filedate, start, end, statistic, fig_info, through_options, store_state, data_state, country):
+                 filedate, start, end, statistic, fig_info, through_options, store_state, data_state, area_type):
     """Generate choropleth figure based on input values and type of click event
 
        :param load_click:               Click event data for load button
@@ -445,18 +452,20 @@ def update_choro(load_click, reset_click, selected_data: dict, zoom_data, months
         df = data[0]
         file_info = data[1]
 
-        if country is not None and len(country) > 0:
-            df_per_country = xvu.data_per_country(df, statistic, year_list, df_ref, months)
-            df_per_country['var'] = round(df_per_country['var'], 2)
-            fig = xvu.plot_geo_choropleth(df, country_features, mapbox_token, statistic, start, end, file_info)
-            store_state = None
-            return 'output_tab', False, fig, store_state
+        if area_type == "gcam":
+            if toggle_value is False:
+                df_per_area = xvu.data_per_country(df, statistic, year_list, df_ref, months)
+                df_per_area['var'] = round(df_per_area['var'], 2)
+            features = country_features
+        else:
+            if toggle_value is False:
+                df_per_area = xvu.data_per_basin(df, statistic, year_list, df_ref, months)
+                df_per_area['var'] = round(df_per_area['var'], 2)
+            features = basin_features
 
-        if toggle_value is False:
-            df_per_basin = xvu.data_per_basin(df, statistic, year_list, df_ref, months)
-            df_per_basin['var'] = round(df_per_basin['var'], 2)
         if click_info == 'reset_btn.n_clicks':
-            fig = xvu.plot_choropleth(df_per_basin, basin_features, mapbox_token, statistic, start, end, file_info)
+            fig = xvu.plot_choropleth(df_per_area, features, mapbox_token, statistic, start, end, file_info, months,
+                                      area_type)
             store_state = None
             return 'output_tab', False, fig, store_state
 
@@ -468,42 +477,41 @@ def update_choro(load_click, reset_click, selected_data: dict, zoom_data, months
         if selected_data is not None and click_info == 'choro_graph.selectedData':
             store_state = selected_data
             if len(selected_data['points']) == 0:
-                fig = xvu.plot_choropleth(df_per_basin, basin_features, mapbox_token, statistic, start, end, file_info,
-                                          months)
+                fig = xvu.plot_choropleth(df_per_area, features, mapbox_token, statistic, start, end, file_info,
+                                          months, area_type)
             else:
                 if toggle_value is True:
-                    fig = xvu.update_choro_grid(df_ref, df, basin_features, year_list, mapbox_token, selected_data,
-                                                start, end, statistic, file_info, months)
+                    fig = xvu.update_choro_grid(df_ref, df, features, year_list, mapbox_token, selected_data,
+                                                start, end, statistic, file_info, months, area_type)
                 else:
-                    fig = xvu.update_choro_select(df_ref, df_per_basin, basin_features, year_list, mapbox_token,
-                                                  selected_data, start, end, statistic, file_info)
-
+                    fig = xvu.update_choro_select(df_ref, df_per_area, features, year_list, mapbox_token,
+                                                  selected_data, start, end, statistic, file_info, months, area_type)
         elif click_info == "grid_toggle.on":
             if store_state is None:
                 selected_data = None
             if toggle_value is True:
-                fig = xvu.update_choro_grid(df_ref, df, basin_features, year_list, mapbox_token, selected_data,
-                                            start, end, statistic, file_info, months)
+                fig = xvu.update_choro_grid(df_ref, df, features, year_list, mapbox_token, selected_data,
+                                            start, end, statistic, file_info, months, area_type)
             else:
-                fig = xvu.update_choro_select(df_ref, df_per_basin, basin_features, year_list, mapbox_token,
-                                              selected_data, start, end, statistic, file_info)
+                fig = xvu.update_choro_select(df_ref, df_per_area, features, year_list, mapbox_token,
+                                              selected_data, start, end, statistic, file_info, months, area_type)
         else:
             if store_state is None:
                 selected_data = None
             if selected_data is not None and len(selected_data['points']) != 0:
                 if toggle_value is True:
-                    fig = xvu.update_choro_grid(df_ref, df, basin_features, year_list, mapbox_token, selected_data,
-                                                start, end, statistic, file_info, months)
+                    fig = xvu.update_choro_grid(df_ref, df, features, year_list, mapbox_token, selected_data,
+                                                start, end, statistic, file_info, months, area_type)
                 else:
-                    fig = xvu.update_choro_select(df_ref, df_per_basin, basin_features, year_list, mapbox_token,
-                                                  selected_data, start, end, statistic, file_info)
+                    fig = xvu.update_choro_select(df_ref, df_per_area, features, year_list, mapbox_token,
+                                                  selected_data, start, end, statistic, file_info, months, area_type)
             else:
                 if toggle_value is True:
-                    fig = xvu.update_choro_grid(df_ref, df, basin_features, year_list, mapbox_token, selected_data,
-                                                start, end, statistic, file_info, months)
+                    fig = xvu.update_choro_grid(df_ref, df, features, year_list, mapbox_token, selected_data,
+                                                start, end, statistic, file_info, months, area_type)
                 else:
-                    fig = xvu.plot_choropleth(df_per_basin, basin_features, mapbox_token, statistic, start, end,
-                                              file_info)
+                    fig = xvu.plot_choropleth(df_per_area, features, mapbox_token, statistic, start, end,
+                                              file_info, months, area_type)
 
         return 'output_tab', toggle_value, fig, store_state
 

@@ -66,6 +66,7 @@ def get_available_months(months_list):
 
     return months
 
+
 def available_through_years(available_year_list, start_year):
     """Return a list of available through years that are >= the start year.
 
@@ -116,13 +117,30 @@ def country_to_gridcell_dict(df_reference):
 
     """
 
+    # geojson structure
+    #     {"type": "Feature",
+    #      "properties": {"scalerank": 1, "featurecla": "Admin-0 country", "labelrank": 3, "sovereignt": "Solomon Islands",
+    #                     "sov_a3": "SLB", "adm0_dif": 0, "level": 2, "type": "Sovereign country", "admin": "Solomon Islands",
+    #                     "adm0_a3": "SLB", "geou_dif": 0, "geounit": "Solomon Islands", "gu_a3": "SLB", "su_dif": 0,
+    #                     "subunit": "Solomon Islands", "su_a3": "SLB", "brk_diff": 0, "name": "Solomon Is.",
+    #                     "name_long": "Solomon Islands", "brk_a3": "SLB", "brk_name": "Solomon Is.", "brk_group": null,
+    #                     "abbrev": "S. Is.", "postal": "SB", "formal_en": null, "formal_fr": null, "note_adm0": null,
+    #                     "note_brk": null, "name_sort": "Solomon Islands", "name_alt": null, "mapcolor7": 1, "mapcolor8": 4,
+    #                     "mapcolor9": 1, "mapcolor13": 6, "pop_est": 595613, "gdp_md_est": 1078, "pop_year": -99,
+    #                     "lastcensus": 2009, "gdp_year": -99, "economy": "7. Least developed region",
+    #                     "income_grp": "4. Lower middle income", "wikipedia": -99, "fips_10": null, "iso_a2": "SB",
+    #                     "iso_a3": "SLB", "iso_n3": "090", "un_a3": "090", "wb_a2": "SB", "wb_a3": "SLB", "woe_id": -99,
+    #                     "adm0_a3_is": "SLB", "adm0_a3_us": "SLB", "adm0_a3_un": -99, "adm0_a3_wb": -99,
+    #                     "continent": "Oceania", "region_un": "Oceania", "subregion": "Melanesia",
+    #                     "region_wb": "East Asia & Pacific", "name_len": 11, "long_len": 15, "abbrev_len": 6, "tiny": -99,
+    #                     "homepart": 1, "filename": "SLB.geojson"}, "geometry": {"type": "MultiPolygon", "coordinates":
     # select target fields
-    df_reference = df_reference[['grid_id', 'basin_id']]
+    df_reference = df_reference[['grid_id', 'country_id', 'country_name']]
 
     # set index that will become dictionary key
     df_reference.set_index('grid_id', inplace=True)
 
-    return df_reference.to_dict()['basin_id']
+    return df_reference.to_dict()['country_name']
 
 
 def prepare_data(df, df_ref):
@@ -141,8 +159,12 @@ def prepare_data(df, df_ref):
     # get dictionary of grid id to basin id
     grid_basin_dict = basin_to_gridcell_dict(df_ref)
 
+    # get country mapping
+    grid_country_dict = country_to_gridcell_dict(df_ref)
+
     # add basin id
     df['basin_id'] = df['id'].map(grid_basin_dict)
+    df['country_name'] = df['id'].map(grid_country_dict)
 
     return df
 
@@ -302,7 +324,7 @@ def data_per_country(df, statistic, yr_list, df_ref, months):
     #     df = df[cols]
 
     # sum data by basin by year
-    grp = df.groupby('basin_id').sum()
+    grp = df.groupby('country_name').sum()
 
     grp.drop(columns=['id'], inplace=True)
 
@@ -331,8 +353,8 @@ def data_per_country(df, statistic, yr_list, df_ref, months):
 
     # Map basin values using df_ref
     grp.reset_index(inplace=True)
-    mapping = dict(df_ref[['basin_id', 'basin_name']].values)
-    grp['basin_name'] = grp.basin_id.map(mapping)
+    # mapping = dict(df_ref[['basin_id', 'basin_name']].values)
+    # grp['basin_name'] = grp.basin_id.map(mapping)
 
     return grp
 
@@ -474,22 +496,22 @@ def plot_geo_choropleth(df_per_country, country_features, mapbox_token, statisti
     unit_type = unit_labels[0]
     unit_display = unit_labels[1]
 
-    fig = go.Figure(go.Choroplethmapbox(geojson=country_features, locations=df_per_country.basin_id,
+    fig = go.Figure(go.Choroplethmapbox(geojson=country_features, locations=df_per_country.country_name,
                                         z=df_per_country['var'].astype(str), marker=dict(opacity=0.7),
-                                        text=df_per_country.apply(lambda row: f"<b>{row['basin_name']}</b><br>"
-                                                                            f"ID: {row['basin_id']}<br><br>"
-                                                                            f"{unit_type} ({unit_display}): {row['var']} "
-                                                                            f"({statistic})",
+                                        text=df_per_country.apply(lambda row: f"<b>{row['country_name']}</b><br>"
+                                        # f"ID: {row['basin_id']}<br><br>"
+                                                                              f"{unit_type} ({unit_display}): {row['var']} "
+                                                                              f"({statistic})",
                                                                   axis=1), colorscale="Plasma",
-                                        featureidkey="properties.basin_id", legendgroup="Runoff",
+                                        featureidkey="properties.name", legendgroup="Runoff",
                                         hoverinfo="text",
                                         colorbar={'separatethousands': True, 'tickformat': ",",
                                                   'title': unit_type + ' ' + '(' + unit_display + ')'},
-                                        customdata=df_per_country['basin_id']))
+                                        customdata=df_per_country['country_name']))
 
     fig.update_layout(
         title={
-            'text': f"<b>{unit_type} ({statistic}) by Basin {start if len(start) <= 4 else start[0:4] + '-' + start[4:6]} - "
+            'text': f"<b>{unit_type} ({statistic}) by Country {start if len(start) <= 4 else start[0:4] + '-' + start[4:6]} - "
                     f"{end if len(end) <= 4 else end[0:4] + '-' + end[4:6]}</b>",
             'y': 0.94,
             'x': 0.5,
@@ -512,7 +534,8 @@ def plot_geo_choropleth(df_per_country, country_features, mapbox_token, statisti
 
     return fig
 
-def plot_choropleth(df_per_basin, basin_features, mapbox_token, statistic, start, end, units):
+
+def plot_choropleth(df_per_basin, basin_features, mapbox_token, statistic, start, end, units, months, area_type):
     """Plot interactive choropleth map for basin level statistics.
 
     :param df_per_basin:            dataframe with basin level stats
@@ -906,7 +929,7 @@ def update_choro_click(df_ref, df_per_basin, basin_features, mapbox_token, graph
 
 
 def update_choro_select(df_ref, df_per_basin, basin_features, year_list, mapbox_token, selected_data, start, end,
-                        statistic, units):
+                        statistic, units, months, area_type):
     """Return a choropleth figured object based off user area select event
 
     :param df_ref:                  Reference dataframe
@@ -1000,7 +1023,7 @@ def update_choro_select(df_ref, df_per_basin, basin_features, year_list, mapbox_
 
 
 def update_choro_grid(df_ref, df, basin_features, year_list, mapbox_token, selected_data, start, end, statistic, units,
-                      months):
+                      months, area_type):
     """Return a choropleth figured object based off user area select event
 
     :param df_ref:                  Reference dataframe
