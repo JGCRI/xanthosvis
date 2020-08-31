@@ -466,6 +466,11 @@ def update_choro(load_click, reset_click, selected_data: dict, zoom_data, months
             features = country_features
 
         if click_info == 'reset_btn.n_clicks':
+            if area_type == "gcam":
+                df_per_area = xvu.data_per_basin(df, statistic, year_list, df_ref, months)
+            else:
+                df_per_area = xvu.data_per_country(df, statistic, year_list, df_ref, months)
+            df_per_area['var'] = round(df_per_area['var'], 2)
             fig = xvu.plot_choropleth(df_per_area, features, mapbox_token, statistic, start, end, file_info, months,
                                       area_type)
             store_state = None
@@ -608,13 +613,13 @@ def set_through_year_list(value, options, current_value):
 @app.callback(
     Output('hydro_graph', 'figure'),
     [Input('choro_graph', 'clickData'), Input("submit_btn", 'n_clicks')],
-    [State('start_year', 'value'),
-     State('through_year', 'value'),
-     State("upload-data", "contents"), State('upload-data', 'filename'), State('upload-data', 'last_modified'),
-     State("through_year", "options"), State('months_select', 'value'), State('area_select', 'value')],
+    [State('start_year', 'value'), State('through_year', 'value'), State("upload-data", "contents"),
+     State('upload-data', 'filename'), State('upload-data', 'last_modified'), State("through_year", "options"),
+     State('months_select', 'value'), State('area_select', 'value'), State("hydro_graph", 'figure')],
     prevent_initial_call=True
 )
-def update_hydro(click_data, n_click, start, end, contents, filename, filedate, year_options, months, area_type):
+def update_hydro(click_data, n_click, start, end, contents, filename, filedate, year_options, months, area_type,
+                 hydro_state):
     """Generate choropleth figure based on input values and type of click event
 
            :param click_data:               Click event data for the choropleth graph
@@ -675,39 +680,47 @@ def update_hydro(click_data, n_click, start, end, contents, filename, filedate, 
 
         # Get data from user click
         points = click_data['points']
-        if points[0]['customdata'][area_custom_index].__class__ == int:
-            location = points[0]['customdata'][area_custom_index]
+        context = dash.callback_context.triggered[0]['prop_id']
+        if context != 'choro_graph.clickData' and 'data' in hydro_state.keys() and len(hydro_state['data']) > 0:
+            hydro_type = hydro_state['data'][0]['customdata'][0][0]
+            if hydro_type == "basin_id" and area_type == "country":
+                raise PreventUpdate
+            elif hydro_type == "country_name" and area_type == "gcam":
+                raise PreventUpdate
+
+        if 'cell_id' not in points[0]['customdata'].keys():
+            location = points[0]['customdata'][area_loc]
             location_type = area_title
         else:
-            location = points[0]['customdata'][1]
+            location = points[0]['customdata']['cell_id']
             location_type = 'cell'
 
         # Process years, basin/cell information
         years = xvu.get_target_years(start, end, year_options)
         if location_type == 'Basin':
-            max_area_row = xvu.hydro_area_lookup(location, df_ref, area_id)
+            max_area_row = xvu.hydro_area_lookup(location, df_ref, area_loc)
             data = xvu.process_file(contents, filename, filedate, years, max_area_row)
             xanthos_data = data[0]
             file_info = data[1]
             processed_data = xvu.prepare_data(xanthos_data, df_ref)
-            hydro_data = xvu.data_per_year_area(processed_data, location, years, months, area_id)
-            return xvu.plot_hydrograph(hydro_data, location, df_ref, 'basin', file_info)
+            hydro_data = xvu.data_per_year_area(processed_data, location, years, months, area_loc)
+            return xvu.plot_hydrograph(hydro_data, location, df_ref, 'basin_id', file_info)
         elif location_type == 'Country':
-            max_area_row = xvu.hydro_area_lookup(location, df_ref, area_id)
+            max_area_row = xvu.hydro_area_lookup(location, df_ref, area_loc)
             data = xvu.process_file(contents, filename, filedate, years, max_area_row)
             xanthos_data = data[0]
             file_info = data[1]
             processed_data = xvu.prepare_data(xanthos_data, df_ref)
-            hydro_data = xvu.data_per_year_area(processed_data, location, years, months, area_id)
-            return xvu.plot_hydrograph(hydro_data, location, df_ref, 'country', file_info)
+            hydro_data = xvu.data_per_year_area(processed_data, location, years, months, area_loc)
+            return xvu.plot_hydrograph(hydro_data, location, df_ref, 'country_name', file_info)
         elif location_type == 'cell':
             max_cell_row = xvu.hydro_cell_lookup(location, df_ref)
             data = xvu.process_file(contents, filename, filedate, years, max_cell_row)
             xanthos_data = data[0]
             file_info = data[1]
             processed_data = xvu.prepare_data(xanthos_data, df_ref)
-            hydro_data = xvu.data_per_year_cell(processed_data, location, years, months)
-            return xvu.plot_hydrograph(hydro_data, location, df_ref, 'cell', file_info)
+            hydro_data = xvu.data_per_year_cell(processed_data, location, years, months, area_loc)
+            return xvu.plot_hydrograph(hydro_data, location, df_ref, 'grid_id', file_info, area_name)
     # Return nothing if there's no uploaded contents
     else:
         data = []
