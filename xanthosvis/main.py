@@ -23,7 +23,7 @@ app = dash.Dash(__name__, external_stylesheets=['assets/base.css', 'assets/custo
 cache = Cache(app.server, config={
     'CACHE_TYPE': 'filesystem',
     'CACHE_DIR': 'cache-directory',
-    "CACHE_DEFAULT_TIMEOUT": 600
+    "CACHE_DEFAULT_TIMEOUT": 6000
 })
 TIMEOUT = 600
 server = app.server
@@ -35,7 +35,7 @@ config = {'displaylogo': False, 'toImageButtonOptions': {
     'width': None,
     'scale': 1  # Multiply title/legend/axis/canvas sizes by this factor
 }}
-
+cache.clear()
 # Access Token for Mapbox
 mapbox_token = open("include/mapbox-token").read()
 
