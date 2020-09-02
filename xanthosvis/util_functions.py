@@ -1,15 +1,14 @@
 import base64
 import collections
+import datetime
 import io
 import json
-from itertools import chain
 from zipfile import ZipFile
 
+import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objs as go
-import datetime
-import numpy as np
 
 
 def get_available_years(in_file, non_year_fields=None):
@@ -171,6 +170,9 @@ def data_per_basin(df, statistic, yr_list, df_ref, months):
     :param df_ref                   Reference dataframe
     :type df_ref                    dataframe
 
+    :param months                   Reference dataframe
+    :type months                    list
+
     :return:                        dataframe; grouped by basin for statistic
 
     """
@@ -240,6 +242,12 @@ def data_per_cell(df, statistic, yr_list, df_ref, months, area_type):
     :param df_ref                   Reference dataframe
     :type df_ref                    dataframe
 
+    :param months                   months from dropdown
+    :type months                    list
+
+    :param area_type                Type of area (country or basin)
+    :type area_type                 str
+
     :return:                        dataframe; grouped by basin for statistic
 
     """
@@ -299,6 +307,9 @@ def data_per_country(df, statistic, yr_list, df_ref, months):
 
     :param df_ref                   Reference dataframe
     :type df_ref                    dataframe
+
+    :param months                   months from dropdown
+    :type months                    list
 
     :return:                        dataframe; grouped by basin for statistic
 
@@ -362,6 +373,12 @@ def data_per_year_area(df, area_id, yr_list, months, area_type):
     :param yr_list                  list of years to consider
     :type yr_list                   list
 
+    :param months                   months from dropdown
+    :type months                    list
+
+    :param area_type                Type of area (country or basin)
+    :type area_type                 str
+
     :return:                        dataframe; sum values per year for a target basin
 
     """
@@ -402,6 +419,12 @@ def data_per_year_cell(df, cell_id, yr_list, months, area_type):
 
     :param yr_list                  list of years to consider
     :type yr_list                   list
+
+    :param months                 months from dropdown
+    :type months                  list
+
+    :param area_type                Type of area (country or basin)
+    :type area_type                 str
 
     :return:                        dataframe; sum values per year for a target basin
 
@@ -480,50 +503,6 @@ def get_unit_info(units):
         unit_type = "unknown"
 
     return [data_type, unit_type]
-
-
-def plot_geo_choropleth(df_per_country, country_features, mapbox_token, statistic, start, end, units):
-    unit_labels = get_unit_info(units)
-    unit_type = unit_labels[0]
-    unit_display = unit_labels[1]
-
-    fig = go.Figure(go.Choroplethmapbox(geojson=country_features, locations=df_per_country.country_name,
-                                        z=df_per_country['var'].astype(str), marker=dict(opacity=0.7),
-                                        text=df_per_country.apply(lambda row: f"<b>{row['country_name']}</b><br>"
-                                        # f"ID: {row['basin_id']}<br><br>"
-                                                                              f"{unit_type} ({unit_display}): {row['var']} "
-                                                                              f"({statistic})",
-                                                                  axis=1), colorscale="Plasma",
-                                        featureidkey="properties.name", legendgroup="Runoff",
-                                        hoverinfo="text",
-                                        colorbar={'separatethousands': True, 'tickformat': ",",
-                                                  'title': unit_type + ' ' + '(' + unit_display + ')'},
-                                        customdata=df_per_country['country_name']))
-
-    fig.update_layout(
-        title={
-            'text': f"<b>{unit_type} ({statistic}) by Country {start if len(start) <= 4 else start[0:4] + '-' + start[4:6]} - "
-                    f"{end if len(end) <= 4 else end[0:4] + '-' + end[4:6]}</b>",
-            'y': 0.94,
-            'x': 0.5,
-            'xanchor': 'center',
-            'yanchor': 'top',
-            'font': dict(
-                family='Roboto',
-                size=20
-            ),
-        },
-        margin=go.layout.Margin(
-            l=30,  # left margin
-            r=10,  # right margin
-            b=10,  # bottom margin
-            t=60  # top margin
-        ),
-        mapbox_style="mapbox://styles/jevanoff/ckckto2j900k01iomsh1f8i20",
-        mapbox_accesstoken=mapbox_token, mapbox={'zoom': 0.6}
-    )
-
-    return fig
 
 
 def plot_choropleth(df_per_area, features, mapbox_token, statistic, start, end, units, months, area_type):
@@ -666,7 +645,7 @@ def plot_hydrograph(df, selection_id, df_ref, id_type, units, area_label=""):
         df_area = df_area['country_name']
         area_label = df_area.iat[0]
         title_text = {
-            'text': f"<b>Country {selection_id}: {area_label} - {unit_type} per {time_type}</b>",
+            'text': f"<b>Country: {selection_id} - {unit_type} per {time_type}</b>",
             'y': 0.92,
             'x': 0.48,
             'xanchor': 'center',
@@ -720,6 +699,9 @@ def get_target_years(start, end, options_list):
 
        :param end:              End year
        :type end:               str
+
+       :param options_list      months from dropdown
+       :type options_list       list
 
        :return:                 list of years
 
@@ -830,15 +812,18 @@ def process_input_years(contents, filename, filedate):
 
 
 def hydro_area_lookup(area_id, df_ref, area_key):
-    """Get max row of a particular basin's grid cells to reduce row count for performance
+    """Get max row of a particular area's grid cells to reduce row count for performance
 
-    :param basin_id:             ID of basin to find it's grid cells
-    :type basin_id:              int
+    :param area_id:             ID of area to find it's grid cells
+    :type area_id:              int
 
     :param df_ref:               Reference dataframe
     :type df_ref:                dataframe
 
-    :return:                     Max row of basin in file data
+    :area_key:                  Type of area (country or basin)
+    :type area_key:               str
+
+    :return:                     Max row of area in file data
 
     """
 
@@ -888,16 +873,22 @@ def update_choro_select(df_ref, df_per_area, features, year_list, mapbox_token, 
     :type selected_data:            dict
 
     :param start:                   Start year
-    :type start:                    int
+    :type start:                    str
 
     :param end:                     End year
-    :type end:                      int
+    :type end:                      str
 
     :param statistic:               Statistic to be computed
     :type statistic:                str
 
     :param units:               Unit of measurement
     :type units:                str
+
+    :param months                 months from dropdown
+    :type months                  list
+
+    :param area_type                Type of area (country or basin)
+    :type area_type                 str
 
     :return:                        Choropleth figure object
 
@@ -913,14 +904,12 @@ def update_choro_select(df_ref, df_per_area, features, year_list, mapbox_token, 
         feature_id = "properties.basin_id"
         area_loc = "basin_id"
         area_title = "Basin"
-        area_custom_index = 0
     else:
         area_name = "country_name"
         area_id = "country_id"
         feature_id = "properties.name"
         area_loc = "country_name"
         area_title = "Country"
-        area_custom_index = 1
 
     if 'cell_id' not in selected_data['points'][0]['customdata'].keys():
         area_id_list = [i['customdata'][area_loc] for i in selected_data['points']]
@@ -943,8 +932,8 @@ def update_choro_select(df_ref, df_per_area, features, year_list, mapbox_token, 
                                         z=df_per_area['var'].astype(str), marker=dict(opacity=0.7),
                                         text=df_per_area.apply(lambda row: f"<b>{row[area_name]}</b><br>"
                                                                            f"ID: {row[area_id]}<br><br>"
-                                                                           f"{unit_type} ({unit_display}): {row['var']} "
-                                                                           f"({statistic})",
+                                                                           f"{unit_type} ({unit_display}): {row['var']}"
+                                                                           f" ({statistic})",
                                                                axis=1), colorscale="Plasma",
                                         featureidkey=feature_id, legendgroup=unit_type,
                                         hoverinfo="text",
@@ -1001,16 +990,22 @@ def update_choro_grid(df_ref, df, basin_features, year_list, mapbox_token, selec
     :type selected_data:            dict
 
     :param start:                   Start year
-    :type start:                    int
+    :type start:                    str
 
     :param end:                     End year
-    :type end:                      int
+    :type end:                      str
 
     :param statistic:               Statistic to be computed
     :type statistic:                str
 
     :param units:               Unit of measurement
     :type units:                str
+
+    :param months                 months from dropdown
+    :type months                  list
+
+    :param area_type                Type of area (country or basin)
+    :type area_type                 str
 
     :return:                        Choropleth figure object
 
@@ -1078,7 +1073,8 @@ def update_choro_grid(df_ref, df, basin_features, year_list, mapbox_token, selec
     # fig = go.Figure(go.Densitymapbox(lat=df_selected['latitude'], lon=df_selected['longitude'],
     #                                  z=df_selected['Runoff (km³)'], radius=10))
     custom_data = [{'basin_id': x, 'country_id': y, 'country_name': z, 'cell_id': c} for x, y, z, c in
-                   zip(df_selected['basin_id'], df_selected['country_id'], df_selected['country_name'], df_selected['id'])]
+                   zip(df_selected['basin_id'], df_selected['country_id'], df_selected['country_name'],
+                       df_selected['id'])]
 
     fig = go.Figure(go.Scattermapbox(lat=df_selected['latitude'], lon=df_selected['longitude'],
                                      mode='markers', customdata=custom_data,

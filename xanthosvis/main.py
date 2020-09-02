@@ -22,7 +22,8 @@ app = dash.Dash(__name__, external_stylesheets=['assets/base.css', 'assets/custo
                 meta_tags=[{"name": "viewport", "content": "width=device-width"}], suppress_callback_exceptions=True)
 cache = Cache(app.server, config={
     'CACHE_TYPE': 'filesystem',
-    'CACHE_DIR': 'cache-directory'
+    'CACHE_DIR': 'cache-directory',
+    "CACHE_DEFAULT_TIMEOUT": 600
 })
 TIMEOUT = 600
 server = app.server
@@ -83,7 +84,7 @@ app.layout = html.Div(
         html.Div(
             className="banner row",
             children=[
-                html.H2(className="h2-title", children="GCIMS Hydrologic Explorer-"),
+                html.H2(className="h2-title", children="GCIMS Hydrologic Explorer"),
                 html.Div(
                     className="div-logo",
                     children=[
@@ -94,7 +95,7 @@ app.layout = html.Div(
                             href="https://gcims.pnnl.gov/global-change-intersectoral-modeling-system", target="blank",
                         ),
                     ]),
-                html.H2(className="h2-title-mobile", children="Xanthos Data Visualization"),
+                html.H2(className="h2-title-mobile", children="GCIMS Hydrologic Explorer"),
             ],
         ),
         # Body of the App
@@ -227,18 +228,6 @@ app.layout = html.Div(
                                             value='gcam',
                                             labelStyle={'display': 'inline-block'}
                                         )
-                                        # dcc.Dropdown(
-                                        #     id='country_select',
-                                        #     className="loader",
-                                        #     options=sorted([{'label': i['properties']['sovereignt'], 'value' :
-                                        #                     i['properties']['sovereignt']} for i in
-                                        #                     country_features['features']], key=lambda x: x["label"]),
-                                        #     clearable=True,
-                                        #     style=dict(
-                                        #         # width='50%',
-                                        #         verticalAlign="middle"
-                                        #     )
-                                        # ),
                                     ],
                                 ),
                                 html.Div(
@@ -388,7 +377,6 @@ def update_choro(load_click, reset_click, selected_data: dict, zoom_data, months
        :param reset_click:             Click event data for reset button
        :type reset_click:              int
 
-
        :param selected_data             Area select event data for the choropleth graph
        :type selected_data              dict
 
@@ -408,16 +396,28 @@ def update_choro(load_click, reset_click, selected_data: dict, zoom_data, months
        :type filedate:                  str
 
        :param start                     Start year value
-       :type start                      int
+       :type start                      str
 
        :param end                       End year value
-       :type end                        int
+       :type end                        str
 
        :param statistic                 Chosen statistic to run on data
        :type statistic                  str
 
        :param fig_info                  Current state of figure object
        :type fig_info                   dict
+
+       :param through_options                  Current state of figure object
+       :type through_options                   dict
+
+       :param store_state                  Current state of figure object
+       :type store_state                   dict
+
+       :param data_state                  Current state of figure object
+       :type data_state                   dict
+
+       :param area_type                  Current state of figure object
+       :type area_type                   dict
 
        :return:                         Choropleth figure
 
@@ -433,10 +433,7 @@ def update_choro(load_click, reset_click, selected_data: dict, zoom_data, months
                 className="alert",
                 children=["Invalid Years: Please choose a start year that is less than end year."],
             )
-            return 'info_tab', toggle_value, {
-                'data': [],
-                'layout': {}
-            }, store_state
+            raise PreventUpdate
 
         click_value = dash.callback_context.triggered[0]['value']
         click_info = dash.callback_context.triggered[0]['prop_id']
@@ -453,7 +450,7 @@ def update_choro(load_click, reset_click, selected_data: dict, zoom_data, months
         data = cache.get(data_state)
         df = data[0]
         file_info = data[1]
-
+        df_per_area = None
         if area_type == "gcam":
             if toggle_value is False:
                 df_per_area = xvu.data_per_basin(df, statistic, year_list, df_ref, months)
@@ -629,10 +626,10 @@ def update_hydro(click_data, n_click, start, end, contents, filename, filedate, 
            :type n_click                    object
 
            :param start                     Start year value
-           :type start                      int
+           :type start                      str
 
            :param end                       End year value
-           :type end                        int
+           :type end                        str
 
            :param contents:                 Contents of uploaded file
            :type contents:                  str
