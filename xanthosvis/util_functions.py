@@ -119,7 +119,7 @@ def country_to_gridcell_dict(df_reference):
     """
 
     # select target fields
-    df_reference = df_reference[['grid_id', 'country_id', 'country_name']]
+    df_reference = df_reference[['grid_id', 'country_id', 'country_name', 'area_hectares']]
 
     # set index that will become dictionary key
     df_reference.set_index('grid_id', inplace=True)
@@ -150,11 +150,12 @@ def prepare_data(df, df_ref):
     df['basin_id'] = df['id'].map(grid_basin_dict)
     df['country_name'] = df['id'].map(grid_country_dict['country_name'])
     df['country_id'] = df['id'].map(grid_country_dict['country_id'])
+    df['area'] = df['id'].map(grid_country_dict['area_hectares'])
 
     return df
 
 
-def data_per_basin(df, statistic, yr_list, df_ref, months):
+def data_per_basin(df, statistic, yr_list, df_ref, months, filename, units):
     """Generate a data frame representing data per basin for all years
     represented by an input statistic.
 
@@ -211,6 +212,12 @@ def data_per_basin(df, statistic, yr_list, df_ref, months):
         msg = f"The statistic requested '{statistic}' is not a valid option."
         raise ValueError(msg)
 
+    unit_type = get_units_from_name(filename)
+    if unit_type != units:
+        if unit_type == 'km³':
+            grp['var'] = (grp['var'] * 1000000) / (grp['area'] / 100)
+    if unit_type == 'mm':
+        grp['var'] = (grp['var'] / 1000000) * (grp['area'] / 100)
     #  Drop unneeded columns
     grp.drop(columns=yr_list, inplace=True)
 
@@ -226,7 +233,7 @@ def data_per_basin(df, statistic, yr_list, df_ref, months):
     return grp
 
 
-def data_per_cell(df, statistic, yr_list, df_ref, months, area_type):
+def data_per_cell(df, statistic, yr_list, df_ref, months, area_type, unit_type, units):
     """Generate a data frame representing data per basin for all years
     represented by an input statistic.
 
@@ -283,6 +290,11 @@ def data_per_cell(df, statistic, yr_list, df_ref, months, area_type):
         msg = f"The statistic requested '{statistic}' is not a valid option."
         raise ValueError(msg)
 
+    if unit_type != units:
+        if unit_type == 'km³':
+            df['var'] = (df['var'] * 1000000) / (df['area'] / 100)
+    if unit_type == 'mm':
+        df['var'] = (df['var'] / 1000000) * (df['area'] / 100)
     # grp.drop(columns=yr_list, inplace=True)
 
     # grp.reset_index(inplace=True)
@@ -292,7 +304,7 @@ def data_per_cell(df, statistic, yr_list, df_ref, months, area_type):
     return df
 
 
-def data_per_country(df, statistic, yr_list, df_ref, months):
+def data_per_country(df, statistic, yr_list, df_ref, months, filename, units):
     """Generate a data frame representing data per basin for all years
     represented by an input statistic.
 
@@ -352,6 +364,13 @@ def data_per_country(df, statistic, yr_list, df_ref, months):
     #  Drop unneeded columns
     grp.drop(columns=yr_list, inplace=True)
 
+    unit_type = get_units_from_name(filename)
+    if unit_type != units:
+        if unit_type == 'km³':
+            grp['var'] = (grp['var'] * 1000000) / (grp['area'] / 100)
+    if unit_type == 'mm':
+        grp['var'] = (grp['var'] / 1000000) * (grp['area'] / 100)
+
     # Map basin values using df_ref
     grp.reset_index(inplace=True)
     mapping = dict(df_ref[['country_name', 'country_id']].values)
@@ -361,7 +380,7 @@ def data_per_country(df, statistic, yr_list, df_ref, months):
     return grp
 
 
-def data_per_year_area(df, area_id, yr_list, months, area_type):
+def data_per_year_area(df, area_id, yr_list, months, area_type, filename, units, df_ref):
     """Generate a data frame representing the sum of the data per year for a target basin.
 
     :param df:                      input data having data per year
@@ -389,11 +408,9 @@ def data_per_year_area(df, area_id, yr_list, months, area_type):
     # Sum data by basin by year
     grp = df.groupby(area_type).sum()
 
-    keep_cols = yr_list
-
     # Adjust columns and reset index
     grp.drop(columns=['id'], inplace=True)
-    grp = grp[keep_cols]
+    grp = grp[yr_list]
     grp.reset_index(inplace=True)
 
     # Get only target basin_id
@@ -405,10 +422,19 @@ def data_per_year_area(df, area_id, yr_list, months, area_type):
     df.reset_index(inplace=True)
     df.columns = ['Year', 'var']
 
+    unit_type = get_units_from_name(filename)
+
+    if unit_type != units:
+        area = df_ref[df_ref[area_type] == area_id]['area_hectares'].sum()
+        if unit_type == 'km³':
+            df['var'] = (df['var'] * 1000000) / (area / 100)
+    if unit_type == 'mm':
+        df['var'] = (df['var'] / 1000000) * (area / 100)
+
     return df
 
 
-def data_per_year_cell(df, cell_id, yr_list, months, area_type):
+def data_per_year_cell(df, cell_id, yr_list, months, area_type, filename, units, df_ref):
     """Generate a data frame representing the sum of the data per year for a target basin.
 
     :param df:                      input data having data per year
@@ -451,11 +477,21 @@ def data_per_year_cell(df, cell_id, yr_list, months, area_type):
     # df = dfx.T.copy()
     # df.reset_index(inplace=True)
     df = df[df['id'] == cell_id].copy()
+
     df.drop(columns=['basin_id', 'id'], inplace=True)
     df = df[keep_cols]
     df = df.T.copy()
     df.reset_index(inplace=True)
     df.columns = ['Year', 'var']
+
+    unit_type = get_units_from_name(filename)
+
+    if unit_type != units:
+        area = df_ref[df_ref['grid_id'] == cell_id]['area_hectares'].values[0]
+        if unit_type == 'km³':
+            df['var'] = (df['var'] * 1000000) / (area / 100)
+    if unit_type == 'mm':
+        df['var'] = (df['var'] / 1000000) * (area / 100)
 
     return df
 
@@ -490,22 +526,45 @@ def get_unit_info(units):
         data_type = "Potential ET"
     else:
         data_type = "unknown"
-    if len(units) > 1:
-        if units[1] == "km3peryear":
-            unit_type = "km³/y"
-        elif units[1] == "km3permonth":
-            unit_type = "km³/m"
-        elif units[1] == "m3persec":
-            unit_type = "m³/s"
-        else:
-            unit_type = "unknown"
+    # if len(units) > 1:
+    #     if units[1] == "km3peryear":
+    #         unit_type = "km³/y"
+    #     elif units[1] == "km3permonth":
+    #         unit_type = "km³/m"
+    #     elif units[1] == "m3persec":
+    #         unit_type = "m³/s"
+    #     else:
+    #         unit_type = "unknown"
+    # else:
+    #     unit_type = "unknown"
+
+    return data_type
+
+
+def get_unit_options(file_info):
+    options = list()
+    if file_info[0] == "avgchflow":
+        options.append({'label': "m³/s", 'value': "m³/s"})
     else:
-        unit_type = "unknown"
+        options.append({'label': "km³", 'value': "km³"})
+        options.append({'label': "mm", 'value': "mm"})
 
-    return [data_type, unit_type]
+    return options
 
 
-def plot_choropleth(df_per_area, features, mapbox_token, statistic, start, end, units, months, area_type):
+def get_units_from_name(filename):
+    print(filename)
+    if 'km3' in filename[0]:
+        unit_val = 'km³'
+    elif 'mm' in filename[0]:
+        unit_val = 'mm'
+    else:
+        unit_val = 'm3'
+    print(unit_val)
+    return unit_val
+
+
+def plot_choropleth(df_per_area, features, mapbox_token, statistic, start, end, file_info, months, area_type, units):
     """Plot interactive choropleth map for basin level statistics.
 
     :param df_per_area:            dataframe with basin level stats
@@ -531,9 +590,9 @@ def plot_choropleth(df_per_area, features, mapbox_token, statistic, start, end, 
 
     """
 
-    unit_labels = get_unit_info(units)
-    unit_type = unit_labels[0]
-    unit_display = unit_labels[1]
+    # unit_labels = get_unit_info(file_info)
+    unit_type = get_unit_info(file_info)
+    # unit_display = unit_labels[1]
 
     if area_type == "gcam":
         area_name = "basin_name"
@@ -556,13 +615,13 @@ def plot_choropleth(df_per_area, features, mapbox_token, statistic, start, end, 
                                         z=df_per_area['var'].astype(str), marker=dict(opacity=0.7),
                                         text=df_per_area.apply(lambda row: f"<b>{row[area_name]}</b><br>"
                                                                            f"ID: {row[area_id]}<br><br>"
-                                                                           f"{unit_type} ({unit_display}): {row['var']} "
+                                                                           f"{unit_type} ({units}): {row['var']} "
                                                                            f"({statistic})",
                                                                axis=1), colorscale="Plasma",
                                         featureidkey=feature_id, legendgroup="Runoff",
                                         hoverinfo="text",
                                         colorbar={'separatethousands': True, 'tickformat': ",",
-                                                  'title': unit_type + ' ' + '(' + unit_display + ')'},
+                                                  'title': unit_type + ' ' + '(' + units + ')'},
                                         customdata=custom_data))
 
     fig.update_layout(
@@ -591,7 +650,7 @@ def plot_choropleth(df_per_area, features, mapbox_token, statistic, start, end, 
     return fig
 
 
-def plot_hydrograph(df, selection_id, df_ref, id_type, units, area_label=""):
+def plot_hydrograph(df, selection_id, df_ref, id_type, file_info, units, area_label=""):
     """Plot a hydrograph of a specific basin.
 
     :param df:                   Input dataframe with data and basin id for a target basin
@@ -607,9 +666,7 @@ def plot_hydrograph(df, selection_id, df_ref, id_type, units, area_label=""):
     :type id_type                str
 
     """
-    unit_labels = get_unit_info(units)
-    unit_type = unit_labels[0]
-    unit_display = unit_labels[1]
+    unit_type = get_unit_info(file_info)
 
     # Process dataframe and set up variables
     df['var'] = round(df['var'], 2)
@@ -629,7 +686,7 @@ def plot_hydrograph(df, selection_id, df_ref, id_type, units, area_label=""):
         df_area = df_area['basin_name']
         area_label = df_area.iat[0]
         title_text = {
-            'text': f"<b>Basin {selection_id}: {area_label} - {unit_type} per {time_type}</b>",
+            'text': f"<b>Basin {selection_id}: {area_label} - {units} per {time_type}</b>",
             'y': 0.92,
             'x': 0.48,
             'xanchor': 'center',
@@ -645,7 +702,7 @@ def plot_hydrograph(df, selection_id, df_ref, id_type, units, area_label=""):
         df_area = df_area['country_name']
         area_label = df_area.iat[0]
         title_text = {
-            'text': f"<b>Country: {selection_id} - {unit_type} per {time_type}</b>",
+            'text': f"<b>Country: {selection_id} - {units} per {time_type}</b>",
             'y': 0.92,
             'x': 0.48,
             'xanchor': 'center',
@@ -659,7 +716,7 @@ def plot_hydrograph(df, selection_id, df_ref, id_type, units, area_label=""):
     elif id_type == 'grid_id':
         area_label = df_ref[df_ref['grid_id'] == selection_id][area_label].iat[0]
         title_text = {
-            'text': f"<b>Grid Cell {selection_id}: {area_label} - {unit_type} per {time_type}</b>",
+            'text': f"<b>Grid Cell {selection_id}: {area_label} - {units} per {time_type}</b>",
             'y': 0.92,
             'x': 0.48,
             'xanchor': 'center',
@@ -686,7 +743,7 @@ def plot_hydrograph(df, selection_id, df_ref, id_type, units, area_label=""):
     )
 
     fig.update_xaxes(nticks=nticks, title_text='Time')
-    fig.update_yaxes(title_text=unit_display, tickformat=tick_format)
+    fig.update_yaxes(title_text=units, tickformat=tick_format)
     # fig.update_layout(yaxis_tickformat=',')
     return fig
 
@@ -701,7 +758,7 @@ def get_target_years(start, end, options_list):
        :type end:               str
 
        :param options_list      months from dropdown
-       :type options_list       list
+       :type options_list       dict
 
        :return:                 list of years
 
@@ -851,7 +908,7 @@ def hydro_cell_lookup(cell_id, df_ref):
 
 
 def update_choro_select(df_ref, df_per_area, features, year_list, mapbox_token, selected_data, start, end,
-                        statistic, units, months, area_type):
+                        statistic, file_info, months, area_type, units):
     """Return a choropleth figured object based off user area select event
 
     :param df_ref:                  Reference dataframe
@@ -894,9 +951,7 @@ def update_choro_select(df_ref, df_per_area, features, year_list, mapbox_token, 
 
     """
 
-    unit_labels = get_unit_info(units)
-    unit_type = unit_labels[0]
-    unit_display = unit_labels[1]
+    unit_type = get_unit_info(file_info)
 
     if area_type == "gcam":
         area_name = "basin_name"
@@ -932,13 +987,13 @@ def update_choro_select(df_ref, df_per_area, features, year_list, mapbox_token, 
                                         z=df_per_area['var'].astype(str), marker=dict(opacity=0.7),
                                         text=df_per_area.apply(lambda row: f"<b>{row[area_name]}</b><br>"
                                                                            f"ID: {row[area_id]}<br><br>"
-                                                                           f"{unit_type} ({unit_display}): {row['var']}"
+                                                                           f"{unit_type} ({units}): {row['var']}"
                                                                            f" ({statistic})",
                                                                axis=1), colorscale="Plasma",
                                         featureidkey=feature_id, legendgroup=unit_type,
                                         hoverinfo="text",
                                         colorbar={'separatethousands': True, 'tickformat': ",",
-                                                  'title': unit_type + ' (' + unit_display + ')'},
+                                                  'title': unit_type + ' (' + units + ')'},
                                         customdata=custom_data))
 
     fig.update_layout(
@@ -967,8 +1022,8 @@ def update_choro_select(df_ref, df_per_area, features, year_list, mapbox_token, 
     return fig
 
 
-def update_choro_grid(df_ref, df, basin_features, year_list, mapbox_token, selected_data, start, end, statistic, units,
-                      months, area_type):
+def update_choro_grid(df_ref, df, basin_features, year_list, mapbox_token, selected_data, start, end, statistic, file_info,
+                      months, area_type, units, filename):
     """Return a choropleth figured object based off user area select event
 
     :param df_ref:                  Reference dataframe
@@ -1011,9 +1066,8 @@ def update_choro_grid(df_ref, df, basin_features, year_list, mapbox_token, selec
 
     """
 
-    unit_labels = get_unit_info(units)
-    unit_type = unit_labels[0]
-    unit_display = unit_labels[1]
+    unit_type = get_unit_info(file_info)
+    unit_from_file = get_units_from_name(filename)
 
     if area_type == "gcam":
         area_name = "basin_name"
@@ -1029,7 +1083,7 @@ def update_choro_grid(df_ref, df, basin_features, year_list, mapbox_token, selec
         area_title = "Country"
 
     if selected_data is None:
-        df_selected = data_per_cell(df, statistic, year_list, df_ref, months, area_type)
+        df_selected = data_per_cell(df, statistic, year_list, df_ref, months, area_type, unit_from_file, units)
 
     else:
         if 'range' in selected_data.keys():
@@ -1040,7 +1094,7 @@ def update_choro_grid(df_ref, df, basin_features, year_list, mapbox_token, selec
             #     area_loc = 'id'
 
             df = df[df[area_loc].isin(flatten(area_id_list))]
-            df_selected = data_per_cell(df, statistic, year_list, df_ref, months, area_type)
+            df_selected = data_per_cell(df, statistic, year_list, df_ref, months, area_type, unit_from_file, units)
             selected_range = selected_data['range']['mapbox']
             min_lon = min((selected_range[0][0], selected_range[1][0]))
             max_lon = max((selected_range[0][0], selected_range[1][0]))
@@ -1055,9 +1109,9 @@ def update_choro_grid(df_ref, df, basin_features, year_list, mapbox_token, selec
             if 'cell_id' not in selected_data['points'][0]['customdata'].keys():
                 area_id_list = [i['customdata'][area_loc] for i in selected_data['points']]
                 df = df[df[area_loc].isin(flatten(area_id_list))]
-                df_selected = data_per_cell(df, statistic, year_list, df_ref, months, area_type)
+                df_selected = data_per_cell(df, statistic, year_list, df_ref, months, area_type, unit_from_file, units)
             else:
-                df_selected = data_per_cell(df, statistic, year_list, df_ref, months, area_type)
+                df_selected = data_per_cell(df, statistic, year_list, df_ref, months, area_type, unit_from_file, units)
                 selected_points = [i['customdata']['cell_id'] for i in selected_data['points']]
                 df_selected = df_selected[df_selected['id'].isin(flatten(selected_points))]
 
@@ -1081,7 +1135,7 @@ def update_choro_grid(df_ref, df, basin_features, year_list, mapbox_token, selec
                                      text=df_selected.apply(lambda row: f"<b>{row[area_name]}</b><br>"
                                                                         f"ID: {row[area_id]}<br>"
                                                                         f"Grid Cell: {row['id']}<br><br>"
-                                                                        f"{unit_type} ({unit_display}): {row['var']} "
+                                                                        f"{unit_type} ({units}): {row['var']} "
                                                                         f"({statistic})",
                                                             axis=1), hoverinfo="text",
 
@@ -1090,7 +1144,7 @@ def update_choro_grid(df_ref, df, basin_features, year_list, mapbox_token, selec
                                          color=df_selected['var'],
                                          opacity=0.4,
                                          showscale=True,
-                                         colorbar={'title': unit_type + '(' + unit_display + ')'}
+                                         colorbar={'title': unit_type + '(' + units + ')'}
                                      )
                                      ))
     fig.update_layout(
