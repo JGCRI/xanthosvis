@@ -5,7 +5,8 @@ pandas~=0.24.2
 seaborn~=0.10.1
 ipywidgets~=7.5.1
 numpy~=1.16.3
-plotly~=4.8.1
+plotly>=4.8.1
 dash-daq~=0.5.0
 flask-caching~=1.9.0
 gunicorn
+mydcc~=0.1.22
