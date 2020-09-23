@@ -417,7 +417,7 @@ app.layout = html.Div(
 
 
 # Callback to generate and load the choropleth graph when user clicks load data button, reset button, or selects
-# content in the graph for filtering
+# content in the graph for filterinxg
 
 @app.callback([Output("tabs", "value"), Output("grid_toggle", "on"),
                Output("select_store", 'data'), Output('confirm', 'displayed'), Output("choro_graph", "figure")],
@@ -832,4 +832,4 @@ def update_hydro(click_data, n_click, start, end, contents, filename, filedate, 
 
 # Start Dash Server
 if __name__ == '__main__':
-    app.run_server(debug=True, threaded=True)
+    app.run_server(debug=False, threaded=True)
