@@ -492,7 +492,7 @@ def update_choro(load_click, reset_click, selected_data, months, toggle_value, c
                                                                       'choro_graph.selectedData',
                                                                       'choro_graph.relayoutData',
                                                                       'reset_btn.n_clicks']:
-        # Check for valid inputs
+        # Check for valid years inputs
         if start > end:
             error_message = html.Div(
                 className="alert",

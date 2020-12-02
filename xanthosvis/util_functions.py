@@ -674,7 +674,7 @@ def plot_choropleth(df_per_area, features, mapbox_token, statistic, start, end, 
                                                                            f"ID: {row[area_id]}<br><br>"
                                                                            f"{unit_type} ({units}): {row['var']} "
                                                                            f"({statistic})",
-                                                                axis=1), colorscale="Plasma",
+                                                               axis=1), colorscale="Plasma",
                                         featureidkey=feature_id, legendgroup="Runoff",
                                         hoverinfo="text",
                                         colorbar={'separatethousands': True, 'tickformat': ",",
@@ -1104,7 +1104,8 @@ def update_choro_select(df_ref, df_per_area, features, year_list, mapbox_token, 
     return fig
 
 
-def update_choro_grid(df_ref, df, basin_features, year_list, mapbox_token, selected_data, start, end, statistic, file_info,
+def update_choro_grid(df_ref, df, basin_features, year_list, mapbox_token, selected_data, start, end, statistic,
+                      file_info,
                       months, area_type, units, filename):
     """Return a scattermapbox figure object for viewing by grid cell
 
