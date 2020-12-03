@@ -1,0 +1,304 @@
+/*Fonts ––––––––––––––––––––––––––––––––––––––––––––––––––*/
+@import url('https://fonts.googleapis.com/css?family=Roboto&display=swap');
+
+body{
+  margin: 0px;
+  padding: 0px;
+  background-color: #F3F4F9;
+  font-family: 'Roboto';
+  color: #203cb3;
+}
+
+*[data-dash-is-loading="true"]{
+}
+
+*[data-dash-is-loading="true"].loader::before,
+*[data-dash-is-loading="true"].loader-fade::before {
+    z-index: 9999;
+    visibility: visible;
+    content: '';
+    box-sizing: border-box;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 30px;
+    height: 30px;
+    margin-top: -10px;
+    margin-left: -10px;
+    border-radius: 50%;
+    border: 2px solid #999;
+    border-top-color: #222;
+    /* Wait for 1s before displaying spinner using 'offset' anomation This
+       avoids flickering when wait times are low. */
+    animation: offset 1s, spinner .6s linear infinite;
+}
+
+
+
+*[data-dash-is-loading="true"]::before{
+    content: "Loading...";
+    display: inline-block;
+    color:crimson;
+	font-size: 14;
+	font-weight: bold;
+    visibility: visible;
+}
+
+
+.form-row {
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  padding-bottom:7px;
+  padding-top:7px;
+ /* justify-content: center;  for centering 3 blocks in the center */
+  /* justify-content: space-between; for space in between */
+}
+
+.form-row:after {
+  content: "";
+  display: table;
+  clear: both; }
+
+.dash-dropdown {
+    width:50%;
+}
+.grid-label
+{
+    display:inline;
+    vertical-align: text-bottom;
+}
+
+.xanthos-div
+{
+	margin: auto;
+	height: 35px;
+	line-height: 35px;
+	padding:3px;
+	vertical-align: middle;
+	width: auto;
+}
+
+.xanthos-img
+{
+  display: inline-block;
+	margin-top: auto;
+	margin-bottom: auto;
+	vertical-align: middle;
+	padding: 3px 9px 5px 1px;
+}
+
+.a-xanthos-link
+{
+	 background: rgb(2,21,70);
+	color:white;
+	display: block;
+	text-decoration: none;
+	padding-left: 10px;
+	line-height: 35px;
+	vertical-align: middle;
+	padding-top:2px;
+}
+
+.custom-tabs-container {
+    width: 85%;
+}
+.custom-tabs {
+    border-top-left-radius: 3px;
+    background-color: #f9f9f9;
+    padding: 0px;
+    border-bottom: 1px solid #d6d6d6;
+}
+
+.custom-tab {
+    color:#586069;
+    border-top-left-radius: 3px;
+    border-top-right-radius: 3px;
+    border-top: 3px solid transparent !important;
+    border-left: 2px !important;
+    border-right: 0px !important;
+    border-bottom: 0px !important;
+    background-color: #fafbfc;
+    padding: 12px !important;
+    font-family: "system-ui";
+	font-weight: bold;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+}
+.custom-tab--selected {
+    color: black;
+    box-shadow: 1px 1px 0px white;
+    border-left: 1px solid lightgrey !important;
+    border-right: 1px solid lightgrey !important;
+    border-top: 3px solid #33C3F0 !important;
+}
+
+.banner {
+  background: rgb(2,21,70);
+  color: white;
+  padding: 12px;
+  padding-left: 48px;
+}
+
+.div-logo{
+  display: inline-block;
+  float: right;
+}
+
+.logo{
+  height: 35px;
+  padding: 6px;
+  margin-top: 3px;
+}
+
+.h2-title, .h2-title-mobile{
+  font-family: 'Roboto';
+  display: inline-block;
+  letter-spacing: 3.8px;
+  font-weight: 800;
+  font-size: 28px;
+}
+
+.h2-title-mobile{
+  display: none;
+}
+
+h2{
+	margin: 10px;
+}
+
+h5, h6{
+  font-family: 'Roboto';
+  font-weight: 600;
+  font-size: 16px;
+}
+
+h5{
+  padding-left: 42px;
+}
+
+.alert {
+  padding: 20px;
+  background-color: #530C0C; 
+  color: white;
+}
+
+.bg-white{
+  background-color: white;
+  padding: 8px 12px;
+  /*height: 500px;*/
+}
+
+.app-body{
+  margin-left: 2.5%;
+}
+
+.card{
+  padding:15px 20px 25px 20px;
+  margin-left: 4%;
+	border-radius: 15px;
+}
+
+.card-left{
+  padding:20px 20px 32px 20px;
+  margin-left: 0px;
+	border-radius: 15px;
+}
+
+.padding-top-bot{
+  padding-top: 7px;
+  padding-bottom: 10px;
+}
+
+.upload{
+  width: 100%;
+  line-height: 60px;
+  border-width: 1px;
+  border-style: dashed;
+  border-radius: 5px;
+  text-align: center;
+}
+
+.upload p, .upload a {
+  display: inline;
+}
+
+.Select-control{
+  border: 1px solid #203cb3;
+}
+
+@media only screen and (max-width: 320px){
+  .Select-menu-outer, .Select-value{
+    font-size: 10.5px;
+  }
+  .upload{
+    padding: 5px;
+  }
+}
+
+/* mobile */
+@media only screen and (max-width: 768px) {
+  .upload{
+    line-height: 60px;
+    border-width: 1px;
+    border-style: dashed;
+    border-radius: 5px;
+    text-align: center;
+    font-size: small;
+  }
+
+  .columns{
+    width: 100%;
+  }
+
+  .card, .card-left{
+    padding: 24px;  
+    margin: 0px;
+  } 
+
+  .bg-white{
+    height: auto;
+  }
+  
+  .banner{
+    padding-left: 24px;
+  }
+
+  .logo{
+    height: 28px;
+    padding-left:0px;
+    padding-bottom:0px;
+  }
+
+  .div-logo{
+    float: left;
+    display: block;
+    width: 100%;
+  }
+
+  .h2-title{
+    display:none;
+  }
+
+  .h2-title-mobile{
+    display:block;
+    float:left;
+  }
+
+  .app-body{
+    margin-left: 0px;
+  }
+
+  .four.columns                   { width: 100%; border-radius: 25px; }
+  .eight.columns                  { width: 100%; border-radius: 25px; }
+
+  .columns{
+    text-align: center;
+  }
+
+  .user-control{
+    padding-top: 24px;
+    padding-bottom: 24px;
+  }
+}
